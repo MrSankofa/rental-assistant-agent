@@ -11,6 +11,10 @@ export const availability: Record<string, SchedulingConfig> =
       {
         start: "2026-10-10T17:00:00",
         end: "2026-10-10T17:30:00"
+      },
+      {
+        start: "2026-10-10T17:00:00",
+        end: "2026-11-10T17:30:00"
       }
     ],
     weeklySchedule: {

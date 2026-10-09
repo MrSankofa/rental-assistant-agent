@@ -1,4 +1,4 @@
-import { DayOfWeek } from "../types/scheduling";
+import { DayOfWeek, ScheduleException } from "../types/scheduling";
 
 export function timeToMinutes(timeStr: string): number {
   const [hours, minutes, seconds] = timeStr.split(":").map(Number);
@@ -30,4 +30,43 @@ export function getDayOfWeek(dateStr: string): DayOfWeek {
   const date = new Date(year, month - 1, day);
 
   return days[date.getDay()];
+}
+
+export function isSlotBlocked(
+  exceptions: ScheduleException[],
+  slotStart: number,
+  durationMinutes: number,
+  targetDate: string
+): boolean {
+
+  return exceptions.some(excp => {
+    const [blockStartDate, blockStartTimeStr] =
+      excp.start.split("T");
+
+    const [blockEndDate, blockEndTimeStr] =
+      excp.end.split("T");
+
+    if (
+      blockStartDate !== targetDate ||
+      blockEndDate !== targetDate
+    ) {
+      return false;
+    }
+
+    const exceptionStart =
+      timeToMinutes(blockStartTimeStr);
+
+    const exceptionEnd =
+      timeToMinutes(blockEndTimeStr);
+
+    const slotEnd =
+      slotStart + durationMinutes;
+
+    return (
+      slotStart < exceptionEnd &&
+      slotEnd > exceptionStart
+    );
+  });
+
+
 }

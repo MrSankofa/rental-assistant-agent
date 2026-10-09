@@ -1,10 +1,10 @@
 import { properties } from "../data/properties";
 import { availability } from "../data/showingAvailability";
 import { PropertyInfoResponse } from "../types/property";
-import { ShowingAvailabilityResponse, SchedulingConfig, ScheduleException } from "../types/scheduling";
-import { timeToMinutes, numberToTimeStr, getDayOfWeek } from "../helpers/helpers";
+import { ShowingAvailabilityResponse, SchedulingConfig } from "../types/scheduling";
+import { timeToMinutes, numberToTimeStr, getDayOfWeek, isSlotBlocked } from "../helpers/helpers";
 
-// todo brett: currently WIP, doesn't account for exceptions or previous bookings.
+// todo brett: currently WIP, doesn't account for previous bookings.
 export function getPropertyInformation(propertyId: string): PropertyInfoResponse {
   const property = properties[propertyId as keyof typeof properties];
 
@@ -20,7 +20,6 @@ export function getPropertyInformation(propertyId: string): PropertyInfoResponse
     property,
   };
 }
-
 
 // targetDate: 2026-10-10, propertyId: virginia
 export function getShowingAvailability(propertyId: string, targetDate: string): ShowingAvailabilityResponse {
@@ -77,16 +76,18 @@ export function getShowingAvailability(propertyId: string, targetDate: string): 
   const availSlotTimeStrEnd = dailySchedule.availableEnd;
 
   let availSlotTimeStartNum = timeToMinutes(availSlotTimeStrStart)
-  let availSlotTimeEndNum = timeToMinutes(availSlotTimeStrEnd)
+  const availSlotTimeEndNum = timeToMinutes(availSlotTimeStrEnd);
+  
+  while (availSlotTimeStartNum + propertyAvailability.slotDurationMinutes <= availSlotTimeEndNum) {
+    const isBlocked = isSlotBlocked(propertyAvailability.exceptions, availSlotTimeStartNum, propertyAvailability.slotDurationMinutes, targetDate);
 
-  // figure out how many slots are available
-  while (availSlotTimeStartNum < availSlotTimeEndNum) {
+    if (!isBlocked) {
+      availableSlots.push(numberToTimeStr(availSlotTimeStartNum));
+    }
 
-    
-    availableSlots.push(numberToTimeStr(availSlotTimeStartNum));
     availSlotTimeStartNum += propertyAvailability.slotDurationMinutes;
   }
-  // return the object
+  
   if (availableSlots.length === 0) {
     return {
       found: true,
