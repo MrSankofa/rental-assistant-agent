@@ -1,4 +1,6 @@
-export const availability = 
+import { SchedulingConfig } from "../agent/tools";
+
+export const availability: Record<string, SchedulingConfig> =
 {
   virginia: {
     timezone: "America/Detroit",
@@ -6,10 +8,10 @@ export const availability =
     activeUntil: "2026-10-17",
     slotDurationMinutes: 30,
     exceptions: [
-        {
+      {
         start: "2026-10-10T17:00:00",
         end: "2026-10-10T17:30:00"
-        }
+      }
     ],
     weeklySchedule: {
       sunday: {
