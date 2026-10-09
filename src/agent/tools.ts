@@ -1,58 +1,10 @@
 import { properties } from "../data/properties";
 import { availability } from "../data/showingAvailability";
+import { PropertyInfoResponse } from "../types/property";
+import { ShowingAvailabilityResponse, SchedulingConfig, ScheduleException } from "../types/scheduling";
+import { timeToMinutes, numberToTimeStr, getDayOfWeek } from "../helpers/helpers";
+
 // todo brett: currently WIP, doesn't account for exceptions or previous bookings.
-
-export type Property = {
-  name: string,
-  available: boolean,
-  rent: number,
-  bedrooms: number,
-  bathrooms: number,
-  utilitiesIncluded: boolean,
-  parking: string,
-  leaseTerm: string,
-  applicationUrl: string,
-}
-export type PropertyInfoResponse = {
-  found: boolean,
-  message?: string
-  property?: Property
-}
-
-export type ShowingAvailabilityResponse = {
-  found: boolean,
-  message?: string,
-  availableSlots: string[]
-}
-export interface TimeSlot {
-  availableStart: string; // "HH:mm:ss" format
-  availableEnd: string;   // "HH:mm:ss" format
-}
-
-export interface ScheduleException {
-  start: string; // ISO 8601 string without offset (e.g., "YYYY-MM-DDTHH:mm:ss")
-  end: string;   // ISO 8601 string without offset
-}
-
-export interface WeeklySchedule {
-  sunday?: TimeSlot;
-  monday?: TimeSlot;
-  tuesday?: TimeSlot;
-  wednesday?: TimeSlot;
-  thursday?: TimeSlot;
-  friday?: TimeSlot;
-  saturday?: TimeSlot;
-}
-
-export interface SchedulingConfig {
-  timezone: string;
-  activeFrom: string; // "YYYY-MM-DD" format
-  activeUntil: string; // "YYYY-MM-DD" format
-  slotDurationMinutes: number;
-  exceptions: ScheduleException[];
-  weeklySchedule: WeeklySchedule;
-}
-
 export function getPropertyInformation(propertyId: string): PropertyInfoResponse {
   const property = properties[propertyId as keyof typeof properties];
 
@@ -70,7 +22,7 @@ export function getPropertyInformation(propertyId: string): PropertyInfoResponse
 }
 
 
-// targetDate: 2026-10-10
+// targetDate: 2026-10-10, propertyId: virginia
 export function getShowingAvailability(propertyId: string, targetDate: string): ShowingAvailabilityResponse {
 
   const getResponse = getPropertyInformation(propertyId);
@@ -93,7 +45,6 @@ export function getShowingAvailability(propertyId: string, targetDate: string): 
     }
   }
 
-  // figure out if the target date is in the active window
 
   const isWithinActiveRange =
     targetDate >= propertyAvailability.activeFrom &&
@@ -130,6 +81,8 @@ export function getShowingAvailability(propertyId: string, targetDate: string): 
 
   // figure out how many slots are available
   while (availSlotTimeStartNum < availSlotTimeEndNum) {
+
+    
     availableSlots.push(numberToTimeStr(availSlotTimeStartNum));
     availSlotTimeStartNum += propertyAvailability.slotDurationMinutes;
   }
@@ -151,36 +104,4 @@ export function getShowingAvailability(propertyId: string, targetDate: string): 
 
 }
 
-function timeToMinutes(timeStr: string): number {
-  const [hours, minutes, seconds] = timeStr.split(":").map(Number);
 
-  return (hours * 60) + minutes;
-}
-
-function numberToTimeStr(timeNum: number): string {
-  // Ensure we don't exceed 24 hours
-  const boundedMinutes = timeNum % 1440;
-
-  const hours = Math.floor(boundedMinutes / 60);
-  const minutes = boundedMinutes % 60;
-
-  // Pad with leading zeros to guarantee clean string comparisons later
-  const hStr = String(hours).padStart(2, '0');
-  const mStr = String(minutes).padStart(2, '0');
-
-  return `${hStr}:${mStr}:00`;
-}
-
-type DayOfWeek = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
-
-function getDayOfWeek(dateStr: string): DayOfWeek {
-  const days: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-
-  // Split the YYYY-MM-DD string into components
-  const [year, month, day] = dateStr.split('-').map(Number);
-
-  // Note: JavaScript months are 0-indexed (January is 0, October is 9)
-  const date = new Date(year, month - 1, day);
-
-  return days[date.getDay()];
-}
