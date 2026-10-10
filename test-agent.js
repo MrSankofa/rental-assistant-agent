@@ -2,11 +2,11 @@ const { askAI } = require("./src/agent/openai");
 
 async function main() {
   try {
-    const response = await askAI(
-      "Hello! What can you help me with as a rental assistant?"
+    const answer = await askAI(
+      "What can you tell me about the Virginia rental property?"
     );
 
-    console.log("AI Agent:", response);
+    console.log("\nAI Agent:", answer);
   } catch (error) {
     console.error("Error:", error.message);
   }
