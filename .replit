@@ -1,6 +1,11 @@
-entrypoint = "index.js"
+entrypoint = "server.js"
+run = "npm start"
 
 hidden = [".config"]
+
+[deployment]
+build = ["sh", "-c", "npm run build"]
+run = ["sh", "-c", "npm start"]
 
 [interpreter]
 command = [
@@ -77,8 +82,12 @@ console = "externalTerminal"
 cwd = "."
 environment = []
 pauseForSourceMap = false
-program = "./index.js"
+program = "./server.js"
 request = "launch"
 sourceMaps = true
 stopOnEntry = false
 type = "pwa-node"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
