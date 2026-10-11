@@ -1,4 +1,4 @@
-import { SchedulingConfig } from "../agent/tools";
+import { SchedulingConfig } from "../types/scheduling";
 
 export const availability: Record<string, SchedulingConfig> =
 {
