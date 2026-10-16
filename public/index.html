@@ -32,18 +32,25 @@
 
     .message {
       margin: 12px 0;
-      padding: 12px;
+      padding: 14px 16px;
       border-radius: 8px;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
-    }
-
-    .user {
-      background: #dbeafe;
+      line-height: 1.55;
     }
 
     .assistant {
       background: #f3f4f6;
+    }
+
+    .assistant a {
+      color: #2563eb;
+      text-decoration: underline;
+      font-weight: 600;
+    }
+
+    .user {
+      background: #dbeafe;
     }
 
     form {
@@ -97,12 +104,33 @@
     const input = document.getElementById("messageInput");
     const messages = document.getElementById("messages");
     const button = document.getElementById("sendButton");
+    let previousResponseId =
+    sessionStorage.getItem("rentalAssistantResponseId");
 
     function addMessage(text, role) {
       const div = document.createElement("div");
 
       div.className = "message " + role;
-      div.textContent = text;
+
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const parts = String(text).split(urlRegex);
+
+      parts.forEach(part => {
+        if (/^https?:\/\//.test(part)) {
+          const link = document.createElement("a");
+
+          link.href = part;
+          link.textContent = part;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+
+          div.appendChild(link);
+        } else {
+          div.appendChild(
+            document.createTextNode(part)
+          );
+        }
+      });
 
       messages.appendChild(div);
       messages.scrollTop = messages.scrollHeight;
@@ -125,7 +153,8 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            message: question
+            message: question,
+            previousResponseId
           })
         });
 
@@ -134,6 +163,15 @@
         }
 
         const data = await response.json();
+
+        if (data.responseId) {
+          previousResponseId = data.responseId;
+
+          sessionStorage.setItem(
+            "rentalAssistantResponseId",
+            previousResponseId
+          );
+        }
 
         addMessage(data.answer, "assistant");
       } catch (error) {

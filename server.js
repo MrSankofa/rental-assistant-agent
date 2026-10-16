@@ -1,4 +1,3 @@
-
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -15,6 +14,7 @@ if (!DEMO_PASSWORD) {
 // Global request limit for this small private demo.
 const MAX_REQUESTS = 30;
 const WINDOW_MS = 15 * 60 * 1000;
+
 let requestCount = 0;
 let windowStart = Date.now();
 
@@ -25,10 +25,12 @@ function isAuthorized(req) {
 
   try {
     const decoded = Buffer.from(
-      header.slice(6), "base64"
+      header.slice(6),
+      "base64"
     ).toString("utf8");
 
     const separator = decoded.indexOf(":");
+
     if (separator === -1) return false;
 
     const username = decoded.slice(0, separator);
@@ -37,9 +39,11 @@ function isAuthorized(req) {
     const expected = Buffer.from(DEMO_PASSWORD);
     const actual = Buffer.from(password);
 
-    return username === "demo" &&
+    return (
+      username === "demo" &&
       expected.length === actual.length &&
-      crypto.timingSafeEqual(expected, actual);
+      crypto.timingSafeEqual(expected, actual)
+    );
   } catch (error) {
     return false;
   }
@@ -50,6 +54,7 @@ function sendJson(res, status, data) {
     "Content-Type": "application/json",
     "Cache-Control": "no-store"
   });
+
   res.end(JSON.stringify(data));
 }
 
@@ -60,6 +65,7 @@ const server = http.createServer(async (req, res) => {
       "WWW-Authenticate": 'Basic realm="Rental Assistant Demo"',
       "Cache-Control": "no-store"
     });
+
     res.end("Authentication required");
     return;
   }
@@ -73,6 +79,7 @@ const server = http.createServer(async (req, res) => {
     fs.createReadStream(
       path.join(__dirname, "public", "index.html")
     ).pipe(res);
+
     return;
   }
 
@@ -87,16 +94,21 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 429, {
         error: "Demo request limit reached. Try later."
       });
+
       return;
     }
 
     let body = "";
+
     try {
       for await (const chunk of req) {
         body += chunk.toString();
 
         if (Buffer.byteLength(body) > 10000) {
-          sendJson(res, 413, { error: "Request too large" });
+          sendJson(res, 413, {
+            error: "Request too large"
+          });
+
           return;
         }
       }
@@ -108,25 +120,45 @@ const server = http.createServer(async (req, res) => {
         !data.message.trim() ||
         data.message.length > 2000
       ) {
-        sendJson(res, 400, { error: "Invalid message" });
+        sendJson(res, 400, {
+          error: "Invalid message"
+        });
+
         return;
       }
 
       requestCount++;
-      const answer = await askAI(data.message);
-      sendJson(res, 200, { answer });
+
+      const previousResponseId =
+        typeof data.previousResponseId === "string"
+          ? data.previousResponseId
+          : null;
+
+      const result = await askAI(
+        data.message,
+        previousResponseId
+      );
+
+      sendJson(res, 200, result);
+
     } catch (error) {
       console.error("Chat error:", error.message);
+
       sendJson(res, 500, {
         error: "Unable to process your message."
       });
     }
+
     return;
   }
 
-  sendJson(res, 404, { error: "Not found" });
+  sendJson(res, 404, {
+    error: "Not found"
+  });
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Rental Assistant running on port ${PORT}`);
+  console.log(
+    `Rental Assistant running on port ${PORT}`
+  );
 });

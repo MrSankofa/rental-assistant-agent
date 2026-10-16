@@ -119,27 +119,78 @@ function extractAnswer(response) {
     .join("\n");
 }
 
-async function askAI(question) {
+async function askAI(question, previousResponseId = null) {
   const instructions = `
     You are a professional rental property assistant.
     Today's date is ${new Date().toISOString().slice(0, 10)}.
-    Property IDs available: virginia.
 
-    Use tools to answer property-specific questions.
-    Never invent rental prices, policies or showing availability.
-    Showing times are in America/Detroit local time.
-    Do not claim that a showing has been booked.
-    Do not make tenant screening or approval decisions.
-    If information is missing, explain that it is unavailable.
-    Be polite and concise.
+    Property IDs available:
+    - virginia: Virginia Park St, Detroit
+    - ziegler: 4932 Ziegler St, Dearborn Heights
+
+    CONVERSATION:
+    - Remember the property established earlier in the conversation.
+    - If the user says "it", "there", "the property", "that house",
+      "schedule a tour", or similar language, use the property already
+      established in the conversation.
+    - Only ask which property they mean when it genuinely has not
+      been established.
+    - When the user is only clarifying which property they mean,
+      answer the original question using that property.
+      Do not provide a full property overview unless they ask for one.
+
+    PROPERTY FACTS:
+    - Use getPropertyInformation for property-specific facts.
+    - Never invent prices, policies, availability, amenities,
+      application information, or property details.
+    - If rent is null, say the rent is currently unavailable.
+
+    SCHEDULING:
+    - If property information contains a showingUrl, that link is the
+      authoritative way to schedule a showing.
+    - When the user asks to schedule or see the property, provide
+      the showingUrl.
+    - Do not claim a showing has been booked unless the user completes
+      scheduling through the provided link.
+    - Do not use getShowingAvailability when a showingUrl is available.
+
+    APPLICATIONS:
+    - If applicationAvailableFrom is in the future, explain briefly
+      that applications are not open yet and provide the opening date.
+
+    RESPONSE STYLE:
+    - Answer only the question that was actually asked.
+    - When the user is only clarifying which property they mean,
+      answer the original question using that property.
+    - Do not provide a full property overview unless requested.
+    - Keep normal answers to 1-3 short paragraphs.
+    - If using bullets, put each bullet on its own line beginning with "- ".
+    - Do not use Markdown formatting.
+    - Do not use Markdown links such as [text](url).
+    - Output URLs as plain https:// URLs on their own line.
+    - Avoid repeating facts the user did not ask about.
+    - You may offer one brief next step when useful.
+
+    SAFETY:
+    - Do not make tenant screening, qualification, approval, ranking,
+      or denial decisions.
+    - If information is unavailable, say so clearly.
+
+    Be polite, helpful, and concise.
   `;
 
-  let response = await requestOpenAI({
+  const initialPayload = {
     model: "gpt-4.1-mini",
     instructions,
     input: question,
     tools
-  });
+  };
+
+  if (previousResponseId) {
+    initialPayload.previous_response_id = previousResponseId;
+  }
+
+  let response = await requestOpenAI(initialPayload);
 
   // Allow up to three consecutive rounds of tool calling.
   for (let round = 0; round < 3; round++) {
@@ -147,7 +198,10 @@ async function askAI(question) {
       .filter(item => item.type === "function_call");
 
     if (calls.length === 0) {
-      return extractAnswer(response) || "No response generated.";
+      return {
+        answer: extractAnswer(response) || "No response generated.",
+        responseId: response.id
+      };
     }
 
     const outputs = calls.map(call => {
@@ -177,7 +231,10 @@ async function askAI(question) {
     });
   }
 
-  return "I couldn't complete that request. Please try again.";
+  return {
+    answer: "I couldn't complete that request. Please try again.",
+    responseId: response.id
+  };
 }
 
 module.exports = { askAI };
