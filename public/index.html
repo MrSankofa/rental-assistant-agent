@@ -109,11 +109,16 @@
 
     function addMessage(text, role) {
       const div = document.createElement("div");
-
       div.className = "message " + role;
 
+      // Convert Markdown-style links into plain URLs first.
+      const normalizedText = String(text).replace(
+        /\[\**(https?:\/\/[^\]\*]+)\**\]\((https?:\/\/[^)]+)\)/g,
+        "$2"
+      );
+
       const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const parts = String(text).split(urlRegex);
+      const parts = normalizedText.split(urlRegex);
 
       parts.forEach(part => {
         if (/^https?:\/\//.test(part)) {
