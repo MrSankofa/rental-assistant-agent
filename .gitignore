@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test output
+coverage/
+
+# Temporary backups
+rental-assistant-index.before-brand.html
+
+# System files
+.DS_Store

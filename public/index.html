@@ -75,11 +75,52 @@
     button:disabled {
       opacity: 0.5;
     }
+
+    .product-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .product-logo {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .product-brand h1 {
+      margin: 0;
+      font-size: clamp(1.5rem, 5vw, 2rem);
+      line-height: 1.2;
+    }
+
+    .product-byline {
+      margin: 5px 0 0;
+      color: #6b7280;
+      font-size: 0.85rem;
+    }
   </style>
 </head>
 
 <body>
-  <h1>Rental Assistant AI</h1>
+  <div class="product-brand">
+    <img
+      class="product-logo"
+      src="/assets/brand/logo-mark-64.png"
+      alt=""
+      width="48"
+      height="48"
+    >
+    <div>
+      <h1>Rental Assistant</h1>
+      <p class="product-byline">
+        An Altruistic Development Product
+      </p>
+    </div>
+  </div>
+
   <p>Ask about available properties, rental terms, or showing times.</p>
 
   <div id="messages" aria-live="polite">

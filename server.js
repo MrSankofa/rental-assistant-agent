@@ -67,6 +67,37 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Serve the shared Sankofa brand logo.
+  if (
+    req.method === "GET" &&
+    req.url === "/assets/brand/logo-mark-64.png"
+  ) {
+    const logoPath = path.join(
+      __dirname,
+      "public",
+      "assets",
+      "brand",
+      "logo-mark-64.png"
+    );
+
+    fs.readFile(logoPath, (error, image) => {
+      if (error) {
+        sendJson(res, 404, { error: "Logo not found" });
+        return;
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "image/png",
+        "Cache-Control": "public, max-age=3600",
+        "X-Content-Type-Options": "nosniff"
+      });
+
+      res.end(image);
+    });
+
+    return;
+  }
+
   // Public rental assistant page.
   if (req.method === "GET" && req.url === "/") {
     res.writeHead(200, {
