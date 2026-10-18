@@ -18,7 +18,7 @@ const FIXTURE = Object.freeze({
 });
 const FIXTURE_TIME = "2026-10-15T00:00:00.000Z";
 function fixtureEnvironmentValid(env) {
-  return env.CLOUD_RUN_JOB === "rental-followups-staging" &&
+  return env.CLOUD_RUN_JOB === "crm-overdue-fixture-staging" &&
     env.CRM_FIXTURE_ENABLED === "true" &&
     env.CRM_BACKEND === "firestore" &&
     env.CRM_SCOPE === "rental-staging" &&
