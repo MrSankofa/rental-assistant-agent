@@ -141,6 +141,8 @@
   </form>
 
 
+  <button id="followUpJump" type="button" hidden style="margin-top:14px">Request staff follow-up</button>
+
   <section id="contactIntake" hidden aria-labelledby="contactHeading" style="background:white;border:1px solid #ddd;border-radius:8px;padding:18px;margin-top:22px">
     <h2 id="contactHeading">Request a follow-up</h2>
     <p>Optionally share your contact information so the property team can follow up. This is not a rental application.</p>
@@ -150,6 +152,7 @@
       <label>Phone <input name="phone" type="tel" autocomplete="tel" maxlength="32"></label>
       <label>Property
         <select name="targetId" required style="padding:12px">
+          <option value="" selected>Select a property</option>
           <option value="ziegler">Ziegler</option>
           <option value="virginia">Virginia</option>
         </select>
@@ -174,8 +177,19 @@
 
   <script>
 
+    const followUpJump = document.getElementById("followUpJump");
+    const contactIntake = document.getElementById("contactIntake");
+    const leadForm = document.getElementById("leadForm");
+    const propertySelect = leadForm.elements.namedItem("targetId");
+    followUpJump.addEventListener("click", () => {
+      contactIntake.scrollIntoView({ behavior: "smooth", block: "start" });
+      leadForm.elements.namedItem("name").focus({ preventScroll: true });
+    });
     fetch("/api/crm/status").then(r => r.json()).then(status => {
-      if (status.publicIntakeEnabled) document.getElementById("contactIntake").hidden = false;
+      if (status.publicIntakeEnabled) {
+        contactIntake.hidden = false;
+        followUpJump.hidden = false;
+      }
     }).catch(() => {});
 
     document.getElementById("leadForm").addEventListener("submit", async (event) => {
@@ -289,6 +303,11 @@
         }
 
         addMessage(data.answer, "assistant");
+        // This is only a property hint from a verified server-side lookup.
+        // No contact details or conversation content are submitted automatically.
+        if (!contactIntake.hidden && (data.propertyId === "virginia" || data.propertyId === "ziegler")) {
+          propertySelect.value = data.propertyId;
+        }
       } catch (error) {
         addMessage(
           "Sorry, something went wrong. Please try again.",
