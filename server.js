@@ -9,6 +9,7 @@ const { CRM } = require("./src/crm/workflows");
 const crypto = require("crypto");
 const crmStore = makeStore();
 const crm = crmStore ? new CRM(crmStore, process.env.CRM_SCOPE || "rental-mvp") : null;
+const crmPublicIntakeEnabled = Boolean(crm && process.env.CRM_PUBLIC_INTAKE_ENABLED === "true" && process.env.PUBLIC_ORIGIN && (process.env.CRM_ADMIN_TOKEN || "").length >= 32);
 const allowedOrigin = process.env.PUBLIC_ORIGIN || "";
 function staffAuthorized(req) {
   const secret = process.env.CRM_ADMIN_TOKEN;
@@ -149,12 +150,18 @@ const server = http.createServer(async (req, res) => {
   }
 
 
+  if (req.method === "GET" && req.url === "/api/crm/status") {
+    sendJson(res, 200, { publicIntakeEnabled: crmPublicIntakeEnabled });
+    return;
+  }
+
   // The CRM is disabled unless explicitly configured. This preserves existing chat behavior.
   if (req.url === "/api/crm/intake" && req.method === "POST") {
-    if(!crm) {sendJson(res,503,{error:"CRM not configured"});return;}
+    if(!crmPublicIntakeEnabled) {sendJson(res,503,{error:"Public intake not enabled"});return;}
     if(!checkSameOrigin(req)) {sendJson(res,403,{error:"Origin not allowed"});return;}
     if(isRateLimited(getClientIp(req))) {sendJson(res,429,{error:"Rate limited"});return;}
     const data=await readJsonBody(req,res,4096); if(!data) return;
+    data.source = "rental-assistant-web";
     try { sendJson(res,202,await crm.intake(data)); }
     catch(error) {sendJson(res,error.status || 500,{error:error.status?error.message:"CRM unavailable"});}
     return;
