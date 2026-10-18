@@ -53,7 +53,8 @@ function normalizeContact(input) {
 class CRM {
  constructor(store,scope="rental-mvp"){this.store=store;this.scope=scope;}
  async audit(actor,type,entityId,details={}) {
-   await this.store.create("audits",id(),{id:id(),scope:this.scope,actor,type,entityId,details,at:new Date().toISOString()});
+   const auditId=id();
+   await this.store.create("audits",auditId,{id:auditId,scope:this.scope,actor,type,entityId,details,at:new Date().toISOString()});
  }
  async intake(input,{actor="prospect",origin="public"}={}) {
   if(!input||typeof input!=="object") throw Object.assign(new Error("Invalid intake"),{status:400});
@@ -92,7 +93,8 @@ class CRM {
     createdAt:now,updatedAt:now,history:[{at:now,actor,stage:domain==="rental"?"CONTACT_CAPTURED":"INTEREST_RECORDED"}]};
   const wasCreated=await this.store.create("engagements",engagementId,engagement);
   if(wasCreated) {
-    await this.store.create("interactions",id(),{id:id(),engagementId,direction:"inbound",channel:"form",source,summary:"Consented contact intake",at:now});
+    const interactionId=id();
+    await this.store.create("interactions",interactionId,{id:interactionId,engagementId,direction:"inbound",channel:"form",source,summary:"Consented contact intake",at:now});
     await this.audit(actor,"intake",engagementId,{domain,targetId,source});
   }
   // Public callers receive no internal IDs, contact fields, or existence information.
