@@ -72,4 +72,4 @@ async function generateFollowupTasks(crm, { now = new Date(), scope = crm.scope 
   }
   return results;
 }
-module.exports = { POLICIES, POLICY_VERSION, generateFollowupTasks, idFor };
+module.exports = { POLICIES, POLICY_VERSION, generateFollowupTasks, idFor, draftFor };
