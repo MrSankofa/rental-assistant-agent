@@ -193,6 +193,19 @@ const server = http.createServer(async (req, res) => {
       catch(e) {sendJson(res,500,{error:"Follow-up generation unavailable"});}
       return;
     }
+    const stagePath=pathname.match(/^\/api\/staff\/engagements\/([a-zA-Z0-9_-]+)\/stage$/);
+    if (req.method === "POST" && stagePath) {
+      const data=await readJsonBody(req,res,4096);
+      if(!data)return;
+      if(!["TOUR_OFFERED","TOUR_SCHEDULED"].includes(data.stage)) {
+        sendJson(res,403,{error:"This milestone requires a separate staff review workflow"});return;
+      }
+      try { sendJson(res,200,await crm.transition(stagePath[1],{
+        stage:data.stage,nextAction:data.nextAction||""
+      },"staff")); }
+      catch(e) {sendJson(res,e.status||500,{error:e.status?e.message:"Unable to update stage"});}
+      return;
+    }
     const taskPath=pathname.match(/^\/api\/staff\/tasks\/([a-zA-Z0-9_-]+)\/(approve|complete|cancel)$/);
     if (req.method === "POST" && taskPath) {
       try { sendJson(res,200,await crm.actTask(taskPath[1],taskPath[2])); }
