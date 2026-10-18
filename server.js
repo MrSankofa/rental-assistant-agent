@@ -7,11 +7,14 @@ const { askAI } = require("./src/agent/openai");
 
 const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
+const { generateFollowupTasks } = require("./src/crm/followups");
+const { staffEnabled, summarizeDashboard } = require("./src/crm/staff");
 const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
 const crypto = require("crypto");
 const crmStore = makeStore();
 const crm = crmStore ? new CRM(crmStore, process.env.CRM_SCOPE || "rental-mvp") : null;
 const crmPublicIntakeEnabled = stagingIntakeEnabled(process.env, Boolean(crm));
+const privateStaffMode = Boolean(crm && staffEnabled(process.env));
 const allowedOrigin = process.env.PUBLIC_ORIGIN || "";
 function staffAuthorized(req) {
   const secret = process.env.CRM_ADMIN_TOKEN;
@@ -163,6 +166,41 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+
+  // Dedicated, IAM-private Cloud Run staff service. Never available on chat or production services.
+  if (pathname === "/staff" || pathname.startsWith("/api/staff/")) {
+    if (!privateStaffMode) { sendJson(res, 404, {error:"Not found"}); return; }
+    if (req.method === "GET" && pathname === "/staff") {
+      res.writeHead(200, {"Content-Type":"text/html; charset=utf-8",
+        "Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});
+      fs.createReadStream(path.join(__dirname,"public","staff.html")).pipe(res);
+      return;
+    }
+    if (req.method === "GET" && pathname === "/api/staff/dashboard") {
+      try {
+        sendJson(res,200,summarizeDashboard(
+          await crm.listContacts(), await crm.listEngagements(), await crm.listTasks()));
+      } catch(e) { sendJson(res,500,{error:"Unable to load staff dashboard"}); }
+      return;
+    }
+    // Mutating actions require an explicit same-origin request and no proxy-based bearer bypass.
+    // Cloud Run IAM is the authentication perimeter of this private staff service.
+    if (req.method === "POST" && !requireStagingOrigin(req.headers.origin,allowedOrigin)) {
+      sendJson(res,403,{error:"Origin not allowed"});return;
+    }
+    if (req.method === "POST" && pathname === "/api/staff/followups/run") {
+      try { sendJson(res,200,await generateFollowupTasks(crm)); }
+      catch(e) {sendJson(res,500,{error:"Follow-up generation unavailable"});}
+      return;
+    }
+    const taskPath=pathname.match(/^\/api\/staff\/tasks\/([a-zA-Z0-9_-]+)\/(approve|complete|cancel)$/);
+    if (req.method === "POST" && taskPath) {
+      try { sendJson(res,200,await crm.actTask(taskPath[1],taskPath[2])); }
+      catch(e) {sendJson(res,e.status||500,{error:e.status?e.message:"Task update unavailable"});}
+      return;
+    }
+    sendJson(res,404,{error:"Not found"});return;
+  }
 
   if (req.method === "GET" && pathname === "/api/crm/status") {
     sendJson(res, 200, { publicIntakeEnabled: crmPublicIntakeEnabled, stagingTestMode: crmPublicIntakeEnabled });
