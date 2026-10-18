@@ -6,7 +6,7 @@ function staffEnabled(env) {
     env.CRM_SCOPE === "rental-staging" &&
     env.GOOGLE_CLOUD_PROJECT === "altruistic-platform";
 }
-function summarizeDashboard(contacts, engagements, tasks) {
+function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disabled"}={}) {
   const byId = new Map(contacts.map(c => [c.id, c]));
   const pipeline = engagements.map(e => {
     const contact = byId.get(e.contactId);
@@ -17,9 +17,10 @@ function summarizeDashboard(contacts, engagements, tasks) {
         consent:contact.consent,preferredChannel:contact.preferredChannel} : null
     };
   });
-  return { pipeline, tasks:tasks.map(t => ({
+  return { deliveryMode, pipeline, tasks:tasks.map(t => ({
     id:t.id,engagementId:t.engagementId,status:t.status,
     summary:t.summary,dueAt:t.dueAt,draft:t.draft||"",
+    draftOrigin:t.draftOrigin||"template",deliveryStatus:t.delivery?.status||"not-sent",
     approved:Boolean(t.approved),automatedDelivery:false
   })) };
 }
