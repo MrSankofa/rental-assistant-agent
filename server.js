@@ -137,6 +137,17 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Serve vetted, read-only conversation suggestions; never user-provided HTML.
+  if (req.method === "GET" && pathname === "/assets/suggested-questions.js") {
+    res.writeHead(200, {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "public, max-age=300",
+      "X-Content-Type-Options": "nosniff"
+    });
+    fs.createReadStream(path.join(__dirname, "src", "ui", "suggestedQuestions.js")).pipe(res);
+    return;
+  }
+
   // Public rental assistant page.
   if (req.method === "GET" && pathname === "/") {
     res.writeHead(200, {
