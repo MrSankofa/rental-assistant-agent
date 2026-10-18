@@ -1,5 +1,6 @@
 entrypoint = "server.js"
 run = "npm start"
+modules = ["nodejs-20"]
 
 hidden = [".config"]
 
