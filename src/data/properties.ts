@@ -8,8 +8,8 @@ export const properties: Record<string, Property> = {
     state: "MI",
     zipCode: "",
 
-    available: true,
-    rent: 1800,
+    available: false,
+    rent: null, // No active vacancy or advertised rent.
 
     bedrooms: 3,
     bathrooms: 1,
@@ -18,7 +18,7 @@ export const properties: Record<string, Property> = {
     parking: "Driveway and street parking available",
     leaseTerm: "12 months",
 
-    applicationUrl: "https://example.com/apply",
+    applicationUrl: "", // No application URL while no vacancy exists.
     applicationAvailableFrom: null,
 
     showingUrl: "",
