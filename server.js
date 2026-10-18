@@ -255,7 +255,8 @@ const server = http.createServer(async (req, res) => {
 
       const result = await askAI(
         data.message.trim(),
-        previousResponseId
+        previousResponseId,
+        { followUpFormAvailable: crmPublicIntakeEnabled }
       );
 
       sendJson(res, 200, result);
