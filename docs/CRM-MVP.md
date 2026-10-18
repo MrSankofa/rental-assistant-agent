@@ -62,3 +62,16 @@ Staff Authorization: Bearer <secret>:
 
 ## No claims beyond proof
 This branch is an MVP, not an end-to-end fully automated leasing platform. Production stays unchanged until human review and deployment approval.
+
+
+## Replit Node version compatibility
+Replit originally configured Node 12 (replit.nix). The CRM requires Node 20 or newer. The feature branch updates replit.nix and the Nix channel. After fetching, check `node -v`. If it still reports Node 12, restart/rebuild the Replit environment before testing; do not deploy with that runtime.
+
+    git pull --ff-only origin feature/crm-platform-mvp
+    node -v
+    npm ci
+    npm test
+    npm run build
+    node scripts/crm-demo.js
+
+The public intake form now stays hidden and the endpoint returns 503 unless the CRM backend, PUBLIC_ORIGIN, secure admin token, and CRM_PUBLIC_INTAKE_ENABLED=true are explicitly configured. This is deliberate until the security readiness gates are met.
