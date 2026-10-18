@@ -1,4 +1,5 @@
 "use strict";
+const copy = value => JSON.parse(JSON.stringify(value));
 
 class StoreConflict extends Error {
   constructor(message = "Concurrent modification") {
@@ -13,25 +14,25 @@ class MemoryStore {
   key(collection, id) { return collection + "/" + id; }
   async get(collection, id) {
     const row = this.rows.get(this.key(collection, id));
-    return row ? { value: structuredClone(row.value), version: String(row.version) } : null;
+    return row ? { value: copy(row.value), version: String(row.version) } : null;
   }
   async create(collection, id, value) {
     const key = this.key(collection, id);
     if (this.rows.has(key)) return false;
-    this.rows.set(key, { value: structuredClone(value), version: 1 });
+    this.rows.set(key, { value: copy(value), version: 1 });
     return true;
   }
   async replace(collection, id, value, expectedVersion) {
     const key = this.key(collection, id);
     const current = this.rows.get(key);
     if (!current || String(current.version) !== String(expectedVersion)) throw new StoreConflict();
-    this.rows.set(key, { value: structuredClone(value), version: current.version + 1 });
+    this.rows.set(key, { value: copy(value), version: current.version + 1 });
   }
   async list(collection, limit = 200) {
     return [...this.rows.entries()]
       .filter(([key]) => key.startsWith(collection + "/"))
       .slice(0, limit)
-      .map(([, row]) => structuredClone(row.value));
+      .map(([, row]) => copy(row.value));
   }
 }
 
