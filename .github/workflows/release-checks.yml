@@ -1,0 +1,25 @@
+name: Rental Assistant release checks
+on:
+  push:
+    branches: [release/rental-assistant-guided-v1]
+  pull_request:
+    branches: [tenant-launch]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm test
+      - run: npm run build
+      - run: node --check server.js
+      - run: node --check src/agent/openai.js
+      - run: node --check src/ui/suggestedQuestions.js
+      - run: |
+          ! grep -q 'api/crm/intake' server.js
+          ! grep -q 'contactIntake' public/index.html
