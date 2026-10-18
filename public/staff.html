@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rental Assistant | Staff CRM</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f3f4f6;color:#172337;margin:0;padding:24px}
+main{max-width:1100px;margin:auto}h1{font-size:1.65rem}p{line-height:1.5}
+header{margin-bottom:24px}section{background:white;border:1px solid #d6dce4;border-radius:10px;padding:18px;margin:20px 0}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+th{font-size:.85rem;color:#536277}button,select,input{font:inherit;padding:9px;border-radius:6px}
+button{background:#245bd5;color:white;border:0;cursor:pointer}button:disabled{opacity:.5}
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.muted{color:#566579;font-size:.9rem}
+.status{min-height:1.5em}.badge{background:#eaf1ff;border-radius:6px;padding:4px}
+@media(max-width:700px){.scroll{overflow:auto}th,td{min-width:115px}}
+</style></head>
+<body><main>
+<header><h1>Rental Assistant | Staff CRM</h1>
+<p class="muted">Private staging workspace. Fictional data only. Follow-up suggestions create review tasks; no emails or texts are sent.</p>
+<div class="toolbar"><button id="refresh" type="button">Refresh records</button>
+<button id="generate" type="button">Check due follow-ups</button>
+<span id="message" class="status" role="status" aria-live="polite"></span></div></header>
+<section><h2>Prospect pipeline</h2><div class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Stage</th><th>Next staff action</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
+<section><h2>Follow-up review queue</h2><p class="muted">Approve a draft for staff review, then mark the internal task complete after taking the action yourself.</p>
+<div class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Action</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
+</main><script>
+const q=id=>document.getElementById(id);
+const stamp=x=>x?new Date(x).toLocaleString():"";
+function cell(row,text){const td=document.createElement("td");td.textContent=String(text??"");row.appendChild(td);return td;}
+async function json(url,options){const r=await fetch(url,{cache:"no-store",...options});const d=await r.json();if(!r.ok)throw Error(d.error||"Request failed");return d;}
+function message(text){q("message").textContent=text;}
+async function reload(){
+ message("Loading...");
+ try{
+  const data=await json("/api/staff/dashboard");
+  const pipeline=q("pipeline"),tasks=q("tasks");pipeline.replaceChildren();tasks.replaceChildren();
+  for(const e of data.pipeline){
+   const tr=document.createElement("tr");
+   cell(tr,e.contact?e.contact.name+" ("+(e.contact.email||e.contact.phone)+")":"Unknown contact");
+   cell(tr,e.property);cell(tr,e.stage);cell(tr,e.nextAction);pipeline.appendChild(tr);
+  }
+  for(const t of data.tasks){
+   const tr=document.createElement("tr");
+   cell(tr,t.summary);cell(tr,stamp(t.dueAt));cell(tr,t.status);cell(tr,t.draft||"No draft");
+   const td=document.createElement("td");
+   if(t.status==="pending-approval"||t.status==="approved"){
+    const action=t.status==="pending-approval"?"approve":"complete";
+    const b=document.createElement("button");b.textContent=action==="approve"?"Approve review":"Mark completed";
+    b.addEventListener("click",async()=>{b.disabled=true;try{await json("/api/staff/tasks/"+encodeURIComponent(t.id)+"/"+action,{method:"POST"});await reload();}catch(e){message(e.message);b.disabled=false;}});
+    td.appendChild(b);
+   }
+   tr.appendChild(td);tasks.appendChild(tr);
+  }
+  if(!data.pipeline.length) pipeline.appendChild(Object.assign(document.createElement("tr"),{textContent:"No engagements"}));
+  if(!data.tasks.length) tasks.appendChild(Object.assign(document.createElement("tr"),{textContent:"No follow-up tasks yet"}));
+  message("Loaded "+data.pipeline.length+" engagements and "+data.tasks.length+" tasks");
+ }catch(e){message("Unable to load CRM: "+e.message);}
+}
+q("refresh").addEventListener("click",reload);
+q("generate").addEventListener("click",async()=>{try{
+ const r=await json("/api/staff/followups/run",{method:"POST"});
+ await reload();message("Follow-up check complete. "+r.created+" new tasks; "+r.alreadyExists+" already queued.");
+}catch(e){message(e.message);}});
+reload();
+</script></body></html>
