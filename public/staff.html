@@ -15,13 +15,13 @@ button{background:#245bd5;color:white;border:0;cursor:pointer}button:disabled{op
 </style></head>
 <body><main>
 <header><h1>Rental Assistant | Staff CRM</h1>
-<p class="muted">Private staging workspace. Fictional data only. Follow-up suggestions create review tasks; no emails or texts are sent.</p>
+<p class="muted">Private staging workspace. Fictional data only. AI-assisted drafts require staff review. Staging sends are simulations only; no emails or texts are sent.</p>
 <div class="toolbar"><button id="refresh" type="button">Refresh records</button>
 <button id="generate" type="button">Check due follow-ups</button>
 <span id="message" class="status" role="status" aria-live="polite"></span></div></header>
 <section><h2>Prospect pipeline</h2><div class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
-<section><h2>Follow-up review queue</h2><p class="muted">Approve a draft for staff review, then mark the internal task complete after taking the action yourself.</p>
-<div class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Action</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
+<section><h2>Follow-up review queue</h2><p class="muted">Generate or edit a draft, approve it, then simulate delivery. No real email will be sent.</p>
+<div class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
 </main><script>
 const q=id=>document.getElementById(id);
 const stamp=x=>x?new Date(x).toLocaleString():"";
@@ -59,14 +59,51 @@ async function reload(){
   }
   for(const t of data.tasks){
    const tr=document.createElement("tr");
-   cell(tr,t.summary);cell(tr,stamp(t.dueAt));cell(tr,t.status);cell(tr,t.draft||"No draft");
+   cell(tr,t.summary);cell(tr,stamp(t.dueAt));cell(tr,t.status);
+   const draftCell=document.createElement("td");
+   const editor=document.createElement("textarea");
+   editor.value=t.draft||"";
+   editor.rows=4;editor.maxLength=1000;editor.style.width="100%";
+   editor.style.minWidth="240px";
+   editor.disabled=t.status!=="pending-approval";
+   editor.setAttribute("aria-label","Follow-up email draft");
+   draftCell.appendChild(editor);
+   const origin=document.createElement("div");
+   origin.className="muted";
+   origin.textContent="Draft: "+(t.draftOrigin||"template")+" | Delivery: "+(t.deliveryStatus||"not-sent");
+   draftCell.appendChild(origin);
+   tr.appendChild(draftCell);
    const td=document.createElement("td");
-   if(t.status==="pending-approval"||t.status==="approved"){
-    const action=t.status==="pending-approval"?"approve":"complete";
-    const b=document.createElement("button");b.textContent=action==="approve"?"Approve review":"Mark completed";
-    b.addEventListener("click",async()=>{b.disabled=true;try{await json("/api/staff/tasks/"+encodeURIComponent(t.id)+"/"+action,{method:"POST"});await reload();}catch(e){message(e.message);b.disabled=false;}});
-    td.appendChild(b);
+   const controls=document.createElement("div");
+   controls.style.display="grid";controls.style.gap="7px";
+   const actionButton=(label,endpoint,body)=>{
+     const b=document.createElement("button");
+     b.textContent=label;b.type="button";
+     b.addEventListener("click",async()=>{
+       b.disabled=true;
+       try{
+         await json("/api/staff/tasks/"+encodeURIComponent(t.id)+"/"+endpoint,{
+           method:"POST",...(body?{headers:{"Content-Type":"application/json"},body:JSON.stringify(body())}:{})
+         });
+         await reload();
+       }catch(e){message(e.message);b.disabled=false;}
+     });
+     controls.appendChild(b);
+   };
+   if(t.status==="pending-approval"){
+     actionButton("Generate AI draft","generate-draft");
+     actionButton("Save edited draft","edit-draft",()=>({draft:editor.value}));
+     actionButton("Approve reviewed draft","approve");
+   }else if(t.status==="approved"){
+     if(data.deliveryMode==="simulation")
+       actionButton("Simulate approved send","send-approved");
+     else {
+       const info=document.createElement("span");
+       info.className="muted";info.textContent="Sending disabled in this environment.";
+       controls.appendChild(info);
+     }
    }
+   td.appendChild(controls);
    tr.appendChild(td);tasks.appendChild(tr);
   }
   if(!data.pipeline.length) pipeline.appendChild(Object.assign(document.createElement("tr"),{textContent:"No engagements"}));
