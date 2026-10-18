@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { requestPath } = require("./src/http/requestPath");
 const { askAI } = require("./src/agent/openai");
 
 
@@ -93,9 +94,10 @@ function isRateLimited(ip) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const pathname = requestPath(req.url);
 
   // Health check for Cloud Run.
-  if (req.method === "GET" && req.url === "/healthz") {
+  if (req.method === "GET" && pathname === "/healthz") {
     sendJson(res, 200, {
       status: "ok"
     });
@@ -106,7 +108,7 @@ const server = http.createServer(async (req, res) => {
   // Serve the shared Sankofa brand logo.
   if (
     req.method === "GET" &&
-    req.url === "/assets/brand/logo-mark-64.png"
+    pathname === "/assets/brand/logo-mark-64.png"
   ) {
     const logoPath = path.join(
       __dirname,
@@ -135,7 +137,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Public rental assistant page.
-  if (req.method === "GET" && req.url === "/") {
+  if (req.method === "GET" && pathname === "/") {
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
@@ -150,13 +152,13 @@ const server = http.createServer(async (req, res) => {
   }
 
 
-  if (req.method === "GET" && req.url === "/api/crm/status") {
+  if (req.method === "GET" && pathname === "/api/crm/status") {
     sendJson(res, 200, { publicIntakeEnabled: crmPublicIntakeEnabled });
     return;
   }
 
   // The CRM is disabled unless explicitly configured. This preserves existing chat behavior.
-  if (req.url === "/api/crm/intake" && req.method === "POST") {
+  if (pathname === "/api/crm/intake" && req.method === "POST") {
     if(!crmPublicIntakeEnabled) {sendJson(res,503,{error:"Public intake not enabled"});return;}
     if(!checkSameOrigin(req)) {sendJson(res,403,{error:"Origin not allowed"});return;}
     if(isRateLimited(getClientIp(req))) {sendJson(res,429,{error:"Rate limited"});return;}
@@ -166,7 +168,7 @@ const server = http.createServer(async (req, res) => {
     catch(error) {sendJson(res,error.status || 500,{error:error.status?error.message:"CRM unavailable"});}
     return;
   }
-  if(req.url.startsWith("/api/crm/admin/")) {
+  if(pathname.startsWith("/api/crm/admin/")) {
     if(!crm) {sendJson(res,503,{error:"CRM not configured"});return;}
     if(!staffAuthorized(req)) {sendJson(res,401,{error:"Unauthorized"});return;}
     if(!checkSameOrigin(req)) {sendJson(res,403,{error:"Origin not allowed"});return;}
@@ -204,7 +206,7 @@ const server = http.createServer(async (req, res) => {
     sendJson(res,404,{error:"Not found"});return;
   }
 
-  if (req.method === "POST" && req.url === "/api/chat") {
+  if (req.method === "POST" && pathname === "/api/chat") {
     const clientIp = getClientIp(req);
 
     if (isRateLimited(clientIp)) {
