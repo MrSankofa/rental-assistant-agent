@@ -39,7 +39,8 @@ class MemoryStore {
 // Firestore REST uses the Cloud Run service account via the metadata server.
 // Documents store one JSON payload to avoid implicit schema migration surprises.
 class FirestoreStore {
-  constructor({ projectId, scope, emulatorHost = "", fetchFn = fetch }) {
+  constructor({ projectId, scope, emulatorHost = "", fetchFn = globalThis.fetch }) {
+    if (typeof fetchFn !== "function") throw new Error("Firestore requires Node.js 18 or newer");
     if (!/^[a-z0-9-]{5,63}$/.test(projectId || "")) throw new Error("Invalid project");
     if (!/^[a-z0-9-]{2,40}$/.test(scope || "")) throw new Error("Invalid CRM scope");
     this.fetchFn = fetchFn;
