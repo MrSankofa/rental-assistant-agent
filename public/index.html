@@ -145,7 +145,7 @@
 
   <section id="contactIntake" hidden aria-labelledby="contactHeading" style="background:white;border:1px solid #ddd;border-radius:8px;padding:18px;margin-top:22px">
     <h2 id="contactHeading">Request a follow-up</h2>
-    <p>Optionally share your contact information so the property team can follow up. This is not a rental application.</p>
+    <p id="leadDescription">Private staging demonstration. Use fictional data only. This records a test inquiry; it does not send a message or notify staff.</p>
     <form id="leadForm" style="display:grid;gap:12px">
       <label>Name <input name="name" autocomplete="name" required maxlength="100"></label>
       <label>Email <input name="email" type="email" autocomplete="email" maxlength="254"></label>
@@ -186,9 +186,19 @@
       leadForm.elements.namedItem("name").focus({ preventScroll: true });
     });
     fetch("/api/crm/status").then(r => r.json()).then(status => {
-      if (status.publicIntakeEnabled) {
+      if (status.publicIntakeEnabled && status.stagingTestMode) {
         contactIntake.hidden = false;
         followUpJump.hidden = false;
+        leadForm.elements.namedItem("name").value = "Fictional Browser";
+        leadForm.elements.namedItem("email").value = "fictional-browser@example.test";
+        leadForm.elements.namedItem("phone").disabled = true;
+        leadForm.elements.namedItem("phone").value = "";
+        leadForm.elements.namedItem("emailConsent").disabled = true;
+        leadForm.elements.namedItem("smsConsent").disabled = true;
+        const interestField = leadForm.elements.namedItem("interest");
+        interestField.value = "Tour inquiry";
+        interestField.readOnly = true;
+        propertySelect.value = "ziegler";
       }
     }).catch(() => {});
 
