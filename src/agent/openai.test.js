@@ -7,7 +7,7 @@ describe("assistant capability claims", () => {
     expect(instructions).toContain("set their own calendar reminder");
   });
   test("does not advertise disabled intake form", () => {
-    expect(buildInstructions()).toContain("follow-up form is currently disabled");
+    expect(buildInstructions()).toContain("Staff follow-up forms and CRM intake are not available in this release");
     expect(buildInstructions()).toContain("Do not claim a form is visible");
   });
   test("available opt-in intake is not misrepresented as a staff notification", () => {
