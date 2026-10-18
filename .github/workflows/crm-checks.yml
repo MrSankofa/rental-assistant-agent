@@ -14,6 +14,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm test
       - run: node scripts/crm-demo.js
       - run: npm run build
