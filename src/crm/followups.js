@@ -1,5 +1,6 @@
 "use strict";
 const crypto = require("crypto");
+const { routeFollowup } = require("./autonomyPolicy");
 
 const POLICY_VERSION = "rental-followup-v1";
 // Delays start at the latest recorded stage change. These create review tasks, not messages.
@@ -47,6 +48,7 @@ async function generateFollowupTasks(crm, { now = new Date(), scope = crm.scope 
       results.skipped++;
       continue;
     }
+    const route = routeFollowup(contactRow.value, engagement);
     const taskId = idFor(scope, engagement);
     const task = {
       id: taskId,
@@ -55,12 +57,13 @@ async function generateFollowupTasks(crm, { now = new Date(), scope = crm.scope 
       summary: policy.summary,
       dueAt: new Date(changed + policy.delayHours * 3600000).toISOString(),
       createdAt: new Date(timestamp).toISOString(),
-      status: "pending-approval",
+      status: route === "autonomous" ? "ready-for-automatic-delivery" : "pending-approval",
       approved: false,
+      routing: route,
       source: "scheduler",
       policyVersion: POLICY_VERSION,
       draft: draftFor(engagement),
-      automatedDelivery: false
+      automatedDelivery: false // Actual delivery remains disabled until integration is verified.
     };
     const inserted = await crm.store.create("tasks", taskId, task);
     if (inserted) {
