@@ -35,7 +35,7 @@ function requireText(x,max=120) {
   return x.trim();
 }
 function safeText(x,max=120){return x==null?"":requireText(x,max);}
-function id(){return crypto.randomUUID();}
+function id(){return crypto.randomBytes(16).toString("hex");}
 function hash(value){return crypto.createHash("sha256").update(value).digest("hex");}
 function validateEmail(s){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);}
 function normalizeContact(input) {
