@@ -7,10 +7,11 @@ const { askAI } = require("./src/agent/openai");
 
 const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
+const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
 const crypto = require("crypto");
 const crmStore = makeStore();
 const crm = crmStore ? new CRM(crmStore, process.env.CRM_SCOPE || "rental-mvp") : null;
-const crmPublicIntakeEnabled = Boolean(crm && process.env.CRM_PUBLIC_INTAKE_ENABLED === "true" && process.env.PUBLIC_ORIGIN && (process.env.CRM_ADMIN_TOKEN || "").length >= 32);
+const crmPublicIntakeEnabled = stagingIntakeEnabled(process.env, Boolean(crm));
 const allowedOrigin = process.env.PUBLIC_ORIGIN || "";
 function staffAuthorized(req) {
   const secret = process.env.CRM_ADMIN_TOKEN;
@@ -153,18 +154,17 @@ const server = http.createServer(async (req, res) => {
 
 
   if (req.method === "GET" && pathname === "/api/crm/status") {
-    sendJson(res, 200, { publicIntakeEnabled: crmPublicIntakeEnabled });
+    sendJson(res, 200, { publicIntakeEnabled: crmPublicIntakeEnabled, stagingTestMode: crmPublicIntakeEnabled });
     return;
   }
 
   // The CRM is disabled unless explicitly configured. This preserves existing chat behavior.
   if (pathname === "/api/crm/intake" && req.method === "POST") {
     if(!crmPublicIntakeEnabled) {sendJson(res,503,{error:"Public intake not enabled"});return;}
-    if(!checkSameOrigin(req)) {sendJson(res,403,{error:"Origin not allowed"});return;}
+    if(!requireStagingOrigin(req.headers.origin, allowedOrigin)) {sendJson(res,403,{error:"Origin not allowed"});return;}
     if(isRateLimited(getClientIp(req))) {sendJson(res,429,{error:"Rate limited"});return;}
     const data=await readJsonBody(req,res,4096); if(!data) return;
-    data.source = "rental-assistant-web";
-    try { sendJson(res,202,await crm.intake(data)); }
+    try { sendJson(res,202,await crm.intake(validateFictionalIntake(data))); }
     catch(error) {sendJson(res,error.status || 500,{error:error.status?error.message:"CRM unavailable"});}
     return;
   }
