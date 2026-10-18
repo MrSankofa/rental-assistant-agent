@@ -7,7 +7,8 @@ function routeFollowup(contact, engagement) {
  if (!ROUTINE_STAGES.has(engagement.stage) || engagement.targetId !== "ziegler")
    return "staff-review";
  if (!contact || contact.consent?.recording !== true || contact.consent?.email !== true ||
-     contact.preferredChannel !== "email" || contact.doNotContact || contact.optedOutAt ||
+     contact.preferredChannel !== "email" || typeof contact.email !== "string" ||
+     !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(contact.email) || contact.doNotContact || contact.optedOutAt ||
      engagement.needsStaffReview || engagement.optedOutAt)
    return "staff-review";
  return "autonomous";
