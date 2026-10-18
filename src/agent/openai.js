@@ -143,10 +143,16 @@ async function askAI(question, previousResponseId = null) {
     - Use getPropertyInformation for property-specific facts.
     - Never invent prices, policies, availability, amenities,
       application information, or property details.
-    - If rent is null, say the rent is currently unavailable.
+    - If rent is null, say no rent is currently advertised; do not quote an old rent.
+    - When available is false, clearly say there are no current vacancies.
+      Do not offer a showing, application, or suggest either is currently open.
+    - Never fabricate or display a placeholder application URL.
+    - Only offer application or showing links when a vacancy is available
+      and the corresponding real URL is present.
 
     SCHEDULING:
-    - If property information contains a showingUrl, that link is the
+    - Never offer showing appointments for properties with available=false.
+    - If property information contains a showingUrl and available=true, that link is the
       authoritative way to schedule a showing.
     - When the user asks to schedule or see the property, provide
       the showingUrl.
