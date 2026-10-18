@@ -141,7 +141,7 @@
   </form>
 
 
-  <section id="contactIntake" aria-labelledby="contactHeading" style="background:white;border:1px solid #ddd;border-radius:8px;padding:18px;margin-top:22px">
+  <section id="contactIntake" hidden aria-labelledby="contactHeading" style="background:white;border:1px solid #ddd;border-radius:8px;padding:18px;margin-top:22px">
     <h2 id="contactHeading">Request a follow-up</h2>
     <p>Optionally share your contact information so the property team can follow up. This is not a rental application.</p>
     <form id="leadForm" style="display:grid;gap:12px">
@@ -173,6 +173,10 @@
   </section>
 
   <script>
+
+    fetch("/api/crm/status").then(r => r.json()).then(status => {
+      if (status.publicIntakeEnabled) document.getElementById("contactIntake").hidden = false;
+    }).catch(() => {});
 
     document.getElementById("leadForm").addEventListener("submit", async (event) => {
       event.preventDefault();
