@@ -48,6 +48,18 @@ describe("safe scheduled rental follow-ups",()=>{
     await community.intake({...input,domain:"community",targetId:"cleanup"},{origin:"staff"});
     expect((await generateFollowupTasks(community,{now:new Date("2028-01-01")})).created).toBe(0);
   });
+  test("opted-in Ziegler inquiry is autonomously queued but never delivered",async()=>{
+    const record=await crm.intake({...input,email:"autonomy@example.test",
+      consent:{recording:true,email:true,sms:false}},{origin:"staff"});
+    const e=await crm.history(record.engagementId);
+    const result=await generateFollowupTasks(crm,{now:new Date(Date.parse(e.updatedAt)+25*3600000)});
+    expect(result.created).toBe(1);
+    const [task]=await crm.listTasks();
+    expect(task.routing).toBe("autonomous");
+    expect(task.status).toBe("ready-for-automatic-delivery");
+    expect(task.automatedDelivery).toBe(false);
+    expect((await generateFollowupTasks(crm,{now:new Date(Date.parse(e.updatedAt)+26*3600000)})).alreadyExists).toBe(1);
+  });
   test("fails closed for scope mismatch",async()=>{
     await expect(generateFollowupTasks(crm,{scope:"rental-production"})).rejects.toThrow("scope mismatch");
     expect(POLICIES.CONTACT_CAPTURED.delayHours).toBe(24);
