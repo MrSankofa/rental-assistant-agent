@@ -140,7 +140,72 @@
     <button id="sendButton" type="submit">Send</button>
   </form>
 
+
+  <section id="contactIntake" aria-labelledby="contactHeading" style="background:white;border:1px solid #ddd;border-radius:8px;padding:18px;margin-top:22px">
+    <h2 id="contactHeading">Request a follow-up</h2>
+    <p>Optionally share your contact information so the property team can follow up. This is not a rental application.</p>
+    <form id="leadForm" style="display:grid;gap:12px">
+      <label>Name <input name="name" autocomplete="name" required maxlength="100"></label>
+      <label>Email <input name="email" type="email" autocomplete="email" maxlength="254"></label>
+      <label>Phone <input name="phone" type="tel" autocomplete="tel" maxlength="32"></label>
+      <label>Property
+        <select name="targetId" required style="padding:12px">
+          <option value="ziegler">Ziegler</option>
+          <option value="virginia">Virginia</option>
+        </select>
+      </label>
+      <label>What are you interested in?
+        <input name="interest" maxlength="200" placeholder="Tour, application questions, etc.">
+      </label>
+      <label>Preferred contact method
+        <select name="preferredChannel" required style="padding:12px">
+          <option value="email">Email</option>
+          <option value="sms">Phone / text</option>
+          <option value="none">No outgoing contact</option>
+        </select>
+      </label>
+      <label><input type="checkbox" name="recording" required> I agree to have these details recorded to process my inquiry.</label>
+      <label><input type="checkbox" name="emailConsent"> I agree to optional email follow-ups (not required).</label>
+      <label><input type="checkbox" name="smsConsent"> I agree to optional text follow-ups (not required).</label>
+      <button type="submit">Submit inquiry</button>
+      <p id="leadStatus" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+
   <script>
+
+    document.getElementById("leadForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const leadForm = event.currentTarget;
+      const status = document.getElementById("leadStatus");
+      const values = new FormData(leadForm);
+      status.textContent = "Submitting...";
+      try {
+        const response = await fetch("/api/crm/intake", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            name: values.get("name"), email: values.get("email")||"",
+            phone: values.get("phone")||"",
+            targetId:values.get("targetId"), domain:"rental",
+            source:"rental-assistant-web",interest:values.get("interest")||"",
+            preferredChannel:values.get("preferredChannel"),
+            consent: {
+              recording: values.get("recording")==="on",
+              email: values.get("emailConsent")==="on",
+              sms: values.get("smsConsent")==="on"
+            }
+          })
+        });
+        const result = await response.json();
+        if(!response.ok) throw new Error(result.error || "Unable to submit");
+        status.textContent = "Your inquiry was received. Thank you.";
+        leadForm.reset();
+      } catch(error) {
+        status.textContent = "We could not save your inquiry. Please try again or use the property contact link.";
+      }
+    });
+
     const form = document.getElementById("chatForm");
     const input = document.getElementById("messageInput");
     const messages = document.getElementById("messages");
