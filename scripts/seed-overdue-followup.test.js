@@ -1,7 +1,7 @@
 const {MemoryStore} = require("../src/crm/storage");
 const {CRM}=require("../src/crm/workflows");
 const {FIXTURE,FIXTURE_TIME,seed,fixtureEnvironmentValid}=require("./seed-overdue-followup");
-const guard={CLOUD_RUN_JOB:"rental-followups-staging",CRM_FIXTURE_ENABLED:"true",
+const guard={CLOUD_RUN_JOB:"crm-overdue-fixture-staging",CRM_FIXTURE_ENABLED:"true",
   CRM_BACKEND:"firestore",CRM_SCOPE:"rental-staging",GOOGLE_CLOUD_PROJECT:"altruistic-platform"};
 test("fixture seeding requires dedicated Cloud Run Job and fictional staging only",()=>{
  expect(fixtureEnvironmentValid(guard)).toBe(true);
