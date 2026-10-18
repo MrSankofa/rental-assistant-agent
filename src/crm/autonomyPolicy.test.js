@@ -1,6 +1,6 @@
 const {routeFollowup}=require("./autonomyPolicy");
 const baseline={domain:"rental",targetId:"ziegler",stage:"CONTACT_CAPTURED"};
-const contact={preferredChannel:"email",consent:{recording:true,email:true}};
+const contact={email:"fictional@example.test",preferredChannel:"email",consent:{recording:true,email:true}};
 test("routine opt-in follow-up routes without message-level approval",()=>{
  expect(routeFollowup(contact,baseline)).toBe("autonomous");
  expect(routeFollowup(contact,{...baseline,stage:"TOUR_OFFERED"})).toBe("autonomous");
