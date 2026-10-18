@@ -5,7 +5,7 @@ const { generateFollowupTasks } = require("../src/crm/followups");
 
 async function main() {
   const env=process.env;
-  if (env.K_JOB !== "rental-followups-staging" ||
+  if (env.CLOUD_RUN_JOB !== "rental-followups-staging" ||
       env.CRM_FOLLOWUPS_JOB_ENABLED !== "true" ||
       env.GOOGLE_CLOUD_PROJECT !== "altruistic-platform" ||
       env.CRM_BACKEND !== "firestore" ||
