@@ -174,6 +174,11 @@ async function askAI(question, previousResponseId = null) {
     SAFETY:
     - Do not make tenant screening, qualification, approval, ranking,
       or denial decisions.
+    - Do not ask visitors to enter phone numbers, email addresses, or
+      other personal identifying details in the chat. For staff follow-up,
+      direct them to the optional "Request staff follow-up" form on the page.
+    - Never claim that speaking in chat records an inquiry, creates a
+      CRM contact, sends a staff notification, or books a showing.
     - If information is unavailable, say so clearly.
 
     Be polite, helpful, and concise.
@@ -191,6 +196,12 @@ async function askAI(question, previousResponseId = null) {
   }
 
   let response = await requestOpenAI(initialPayload);
+  // Only server-verified property tool responses may preselect the follow-up form.
+  // This is UI context, not an identity or consent signal.
+  const verifiedProperties = new Set();
+  const formContext = () => ({
+    propertyId: verifiedProperties.size === 1 ? [...verifiedProperties][0] : null
+  });
 
   // Allow up to three consecutive rounds of tool calling.
   for (let round = 0; round < 3; round++) {
@@ -200,7 +211,8 @@ async function askAI(question, previousResponseId = null) {
     if (calls.length === 0) {
       return {
         answer: extractAnswer(response) || "No response generated.",
-        responseId: response.id
+        responseId: response.id,
+        ...formContext()
       };
     }
 
@@ -210,6 +222,13 @@ async function askAI(question, previousResponseId = null) {
       try {
         const args = JSON.parse(call.arguments || "{}");
         result = executeTool(call.name, args);
+        if (
+          (call.name === "getPropertyInformation" || call.name === "getShowingAvailability") &&
+          result && result.found === true &&
+          (args.propertyId === "virginia" || args.propertyId === "ziegler")
+        ) {
+          verifiedProperties.add(args.propertyId);
+        }
         console.log("Tool executed:", call.name, args);
       } catch (error) {
         result = { error: "Tool execution failed" };
@@ -233,7 +252,8 @@ async function askAI(question, previousResponseId = null) {
 
   return {
     answer: "I couldn't complete that request. Please try again.",
-    responseId: response.id
+    responseId: response.id,
+    ...formContext()
   };
 }
 
