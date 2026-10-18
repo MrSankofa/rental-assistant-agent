@@ -76,6 +76,13 @@
       opacity: 0.5;
     }
 
+    .guide { background: #fff; border: 1px solid #dce3ed; border-radius: 10px; padding: 16px; margin: 16px 0; }
+    .guide h2 { font-size: 1.05rem; margin: 0 0 8px; color: #1f2937; }
+    .guide p { font-size: 0.92rem; color: #475569; margin: 0 0 10px; line-height: 1.5; }
+    .journey { font-size: 0.86rem; color: #475569; margin-bottom: 12px; line-height: 1.6; }
+    .suggestion-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    button.suggestion { background: #eff6ff; color: #174cb2; border: 1px solid #a7c5ef; border-radius: 999px; padding: 9px 13px; font-size: 0.9rem; text-align: left; }
+    button.suggestion:hover, button.suggestion:focus-visible { background: #dbeafe; outline-offset: 2px; }
     .product-brand {
       display: flex;
       align-items: center;
@@ -123,6 +130,13 @@
 
   <p>Ask about available properties, rental terms, or showing times.</p>
 
+  <section class="guide" aria-labelledby="guideHeading">
+    <h2 id="guideHeading">Not sure where to start?</h2>
+    <p>Choose a question below, or type your own. I'll help you learn about a rental, find the showing link, and understand application timing.</p>
+    <div class="journey"><strong>How it works:</strong> Explore a property → Request a showing through its link → Apply when applications open → Ask for staff help if needed.</div>
+    <div id="suggestions" class="suggestion-list" role="group" aria-label="Suggested questions"></div>
+  </section>
+
   <div id="messages" aria-live="polite">
     <div class="message assistant">
       Hello! I'm your rental assistant.
@@ -140,13 +154,41 @@
     <button id="sendButton" type="submit">Send</button>
   </form>
 
+
+  <script src="/assets/suggested-questions.js"></script>
   <script>
+
     const form = document.getElementById("chatForm");
     const input = document.getElementById("messageInput");
     const messages = document.getElementById("messages");
     const button = document.getElementById("sendButton");
     let previousResponseId =
     sessionStorage.getItem("rentalAssistantResponseId");
+    const suggestionArea = document.getElementById("suggestions");
+    const questionSuggestions = window.RentalAssistantSuggestions;
+    let currentPropertyId = null;
+    let lastAskedQuestion = "";
+
+    function renderSuggestions() {
+      suggestionArea.replaceChildren();
+      if (!questionSuggestions) return;
+      const items = questionSuggestions.getSuggestedQuestions(currentPropertyId, lastAskedQuestion);
+      for (const item of items) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "suggestion";
+        chip.textContent = item.label;
+        chip.setAttribute("aria-label", "Ask: " + item.question);
+        chip.disabled = button.disabled;
+        chip.addEventListener("click", () => {
+          if (button.disabled) return;
+          input.value = item.question;
+          form.requestSubmit();
+        });
+        suggestionArea.appendChild(chip);
+      }
+    }
+    renderSuggestions();
 
     function addMessage(text, role) {
       const div = document.createElement("div");
@@ -189,8 +231,10 @@
       if (!question) return;
 
       addMessage(question, "user");
+      lastAskedQuestion = question;
       input.value = "";
       button.disabled = true;
+      renderSuggestions();
 
       try {
         const response = await fetch("/api/chat", {
@@ -220,6 +264,11 @@
         }
 
         addMessage(data.answer, "assistant");
+        // This is only a property hint from a verified server-side lookup.
+        // No contact details or conversation content are submitted automatically.
+        if (data.propertyId === "virginia" || data.propertyId === "ziegler") {
+          currentPropertyId = data.propertyId;
+        }
       } catch (error) {
         addMessage(
           "Sorry, something went wrong. Please try again.",
@@ -227,6 +276,7 @@
         );
       } finally {
         button.disabled = false;
+        renderSuggestions();
         input.focus();
       }
     });

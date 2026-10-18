@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { requestPath } = require("./src/http/requestPath");
 const { askAI } = require("./src/agent/openai");
 
 const PORT = process.env.PORT || 3000;
@@ -57,9 +58,10 @@ function isRateLimited(ip) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const pathname = requestPath(req.url);
 
   // Health check for Cloud Run.
-  if (req.method === "GET" && req.url === "/healthz") {
+  if (req.method === "GET" && pathname === "/healthz") {
     sendJson(res, 200, {
       status: "ok"
     });
@@ -70,7 +72,7 @@ const server = http.createServer(async (req, res) => {
   // Serve the shared Sankofa brand logo.
   if (
     req.method === "GET" &&
-    req.url === "/assets/brand/logo-mark-64.png"
+    pathname === "/assets/brand/logo-mark-64.png"
   ) {
     const logoPath = path.join(
       __dirname,
@@ -98,8 +100,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && pathname === "/assets/suggested-questions.js") {
+    res.writeHead(200, {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "public, max-age=300"
+    });
+    fs.createReadStream(path.join(__dirname, "src", "ui", "suggestedQuestions.js")).pipe(res);
+    return;
+  }
+
   // Public rental assistant page.
-  if (req.method === "GET" && req.url === "/") {
+  if (req.method === "GET" && pathname === "/") {
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
@@ -113,7 +125,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "POST" && req.url === "/api/chat") {
+  if (req.method === "POST" && pathname === "/api/chat") {
     const clientIp = getClientIp(req);
 
     if (isRateLimited(clientIp)) {
