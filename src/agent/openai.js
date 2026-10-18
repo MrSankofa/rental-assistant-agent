@@ -119,8 +119,8 @@ function extractAnswer(response) {
     .join("\n");
 }
 
-async function askAI(question, previousResponseId = null) {
-  const instructions = `
+function buildInstructions({ followUpFormAvailable = false } = {}) {
+  return `
     You are a professional rental property assistant.
     Today's date is ${new Date().toISOString().slice(0, 10)}.
 
@@ -163,6 +163,11 @@ async function askAI(question, previousResponseId = null) {
     APPLICATIONS:
     - If applicationAvailableFrom is in the future, explain briefly
       that applications are not open yet and provide the opening date.
+    - You do not have any reminder, notification, calendar, email, or
+      SMS tools. Never offer to remind the visitor about future
+      openings, follow up automatically, or contact them later.
+    - If asked for a reminder, say that automated reminders are not
+      available and suggest they set their own calendar reminder.
 
     RESPONSE STYLE:
     - Answer only the question that was actually asked.
@@ -181,14 +186,20 @@ async function askAI(question, previousResponseId = null) {
     - Do not make tenant screening, qualification, approval, ranking,
       or denial decisions.
     - Do not ask visitors to enter phone numbers, email addresses, or
-      other personal identifying details in the chat. For staff follow-up,
-      direct them to the optional "Request staff follow-up" form on the page.
+      other personal identifying details in the chat.
+    ${followUpFormAvailable ?
+      '- For staff follow-up, direct visitors to the optional "Request staff follow-up" form. Say that submitting it records an inquiry for staff review, not that someone has already been notified.' :
+      '- The staff follow-up form is currently disabled. Do not claim a form is visible, promise staff contact, or direct visitors to an unavailable form.'}
     - Never claim that speaking in chat records an inquiry, creates a
       CRM contact, sends a staff notification, or books a showing.
     - If information is unavailable, say so clearly.
 
     Be polite, helpful, and concise.
   `;
+}
+
+async function askAI(question, previousResponseId = null, { followUpFormAvailable = false } = {}) {
+  const instructions = buildInstructions({ followUpFormAvailable });
 
   const initialPayload = {
     model: "gpt-4.1-mini",
@@ -263,4 +274,4 @@ async function askAI(question, previousResponseId = null) {
   };
 }
 
-module.exports = { askAI };
+module.exports = { askAI, buildInstructions };
