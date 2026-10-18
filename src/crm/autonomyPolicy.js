@@ -8,7 +8,7 @@ function routeFollowup(contact, engagement) {
    return "staff-review";
  if (!contact || contact.consent?.recording !== true || contact.consent?.email !== true ||
      contact.preferredChannel !== "email" || typeof contact.email !== "string" ||
-     !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(contact.email) || contact.doNotContact || contact.optedOutAt ||
+     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email) || contact.doNotContact || contact.optedOutAt ||
      engagement.needsStaffReview || engagement.optedOutAt)
    return "staff-review";
  return "autonomous";
