@@ -116,7 +116,7 @@ class CRM {
    if(!row) throw Object.assign(new Error("Not found"),{status:404});
    const e=row.value;
    const transitions=e.domain==="rental"?NEXT_RENTAL:NEXT_COMMUNITY;
-   if(!transitions[e.stage]?.includes(target)) throw Object.assign(new Error("Invalid stage transition"),{status:409});
+   if(!(transitions[e.stage] || []).includes(target)) throw Object.assign(new Error("Invalid stage transition"),{status:409});
    if(STAFF_REQUIRED.has(target)&&actor!=="staff" || APPROVAL_STAGES.has(target)&&input.confirmed!==true)
      throw Object.assign(new Error("Staff confirmation required"),{status:403});
    // External milestones must include an evidence reference or recorded staff attestation.
