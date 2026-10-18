@@ -8,6 +8,7 @@ const { askAI } = require("./src/agent/openai");
 const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
 const { generateFollowupTasks } = require("./src/crm/followups");
+const { prepareDraft, editDraft, approveAndSend, deliveryMode } = require("./src/crm/messaging");
 const { staffEnabled, summarizeDashboard } = require("./src/crm/staff");
 const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
 const crypto = require("crypto");
@@ -179,7 +180,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && pathname === "/api/staff/dashboard") {
       try {
         sendJson(res,200,summarizeDashboard(
-          await crm.listContacts(), await crm.listEngagements(), await crm.listTasks()));
+          await crm.listContacts(), await crm.listEngagements(), await crm.listTasks(),
+          {deliveryMode:deliveryMode(process.env)}));
       } catch(e) { sendJson(res,500,{error:"Unable to load staff dashboard"}); }
       return;
     }
@@ -204,6 +206,19 @@ const server = http.createServer(async (req, res) => {
         stage:data.stage,nextAction:data.nextAction||""
       },"staff")); }
       catch(e) {sendJson(res,e.status||500,{error:e.status?e.message:"Unable to update stage"});}
+      return;
+    }
+    const draftPath=pathname.match(/^\/api\/staff\/tasks\/([a-zA-Z0-9_-]+)\/(generate-draft|edit-draft|send-approved)$/);
+    if(req.method==="POST" && draftPath) {
+      try {
+        let result;
+        if(draftPath[2]==="generate-draft")result=await prepareDraft(crm,draftPath[1]);
+        else if(draftPath[2]==="edit-draft") {
+          const body=await readJsonBody(req,res,4096);if(!body)return;
+          result=await editDraft(crm,draftPath[1],body.draft);
+        } else result=await approveAndSend(crm,draftPath[1]);
+        sendJson(res,200,result);
+      }catch(e){sendJson(res,e.status||500,{error:e.status?e.message:"Message workflow unavailable"});}
       return;
     }
     const taskPath=pathname.match(/^\/api\/staff\/tasks\/([a-zA-Z0-9_-]+)\/(approve|complete|cancel)$/);
