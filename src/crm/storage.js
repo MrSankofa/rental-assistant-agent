@@ -39,15 +39,22 @@ class MemoryStore {
 // Firestore REST uses the Cloud Run service account via the metadata server.
 // Documents store one JSON payload to avoid implicit schema migration surprises.
 class FirestoreStore {
-  constructor({ projectId, scope, emulatorHost = "", fetchFn = globalThis.fetch }) {
+  constructor({ projectId, scope, databaseId = "(default)", emulatorHost = "", fetchFn = globalThis.fetch }) {
     if (typeof fetchFn !== "function") throw new Error("Firestore requires Node.js 18 or newer");
     if (!/^[a-z0-9-]{5,63}$/.test(projectId || "")) throw new Error("Invalid project");
     if (!/^[a-z0-9-]{2,40}$/.test(scope || "")) throw new Error("Invalid CRM scope");
+    // Reject unsafe and empty names before constructing a Firestore request URL.
+    if (databaseId !== "(default)" &&
+        (typeof databaseId !== "string" ||
+         !/^[a-z][a-z0-9-]{2,60}[a-z0-9]$/.test(databaseId))) {
+      throw new Error("Invalid Firestore database ID");
+    }
+    this.databaseId = databaseId;
     this.fetchFn = fetchFn;
     this.token = null;
     this.tokenUntil = 0;
     this.base = (emulatorHost ? "http://" + emulatorHost : "https://firestore.googleapis.com") +
-      "/v1/projects/" + projectId + "/databases/(default)/documents/scopes/" + scope;
+      "/v1/projects/" + projectId + "/databases/" + databaseId + "/documents/scopes/" + scope;
     this.emulator = Boolean(emulatorHost);
   }
   async bearer() {
@@ -135,6 +142,8 @@ function makeStore(env = process.env) {
     return new FirestoreStore({
       projectId: env.GOOGLE_CLOUD_PROJECT || env.GCP_PROJECT || "altruistic-platform",
       scope: env.CRM_SCOPE || "rental-mvp",
+      // Preserve (default) for existing clients; reject explicitly invalid IDs.
+      databaseId: env.CRM_DATABASE === undefined ? "(default)" : env.CRM_DATABASE,
       emulatorHost: env.FIRESTORE_EMULATOR_HOST || ""
     });
   }
