@@ -29,6 +29,8 @@ async function main({
     return { outcome: "dry-run" };
   }
   requireManualTestEnvironment({ scope: "rental-staging" }, env, EXPECTED_TASK_ID);
+  if (env.CRM_DATABASE !== "rental-email-staging")
+    throw Error("Dedicated CRM email database required");
   if (!env.RESEND_API_KEY || !env.RESEND_API_KEY.startsWith("re_"))
     throw Error("Controlled CRM email credentials unavailable");
   const crm = makeCrm();
