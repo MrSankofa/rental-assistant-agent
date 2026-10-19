@@ -54,15 +54,26 @@ async function deliverControlledCrmTest(crm,taskId,{
   text:row.value.draft,
   idempotencyKey:claim.idempotencyKey
  };
- // Never retry automatically. A timeout can occur after Resend accepted the message.
+ // Keep provider and persistence failures separate. An accepted email must
+ // never be reclassified as a failed provider request or automatically resent.
+ let receipt;
  try{
-  const receipt=await sendResendEmail(message,{apiKey:env.RESEND_API_KEY,fetchFn});
+  receipt=await sendResendEmail(message,{apiKey:env.RESEND_API_KEY,fetchFn});
+ }catch(_){
+  // A timeout may occur after Resend accepts the message. Preserve the reservation
+  // when Firestore is unavailable; the next attempt will fail closed.
+  try{await finishReservedFollowup(crm,taskId,{status:"uncertain"});}
+  catch(_persistenceError){}
+  return {outcome:"needs-reconciliation"};
+ }
+ try{
   const result=await finishReservedFollowup(crm,taskId,{
    status:"accepted",providerId:receipt.providerId});
   return {outcome:result.updated?"accepted":"needs-reconciliation",providerId:receipt.providerId};
  }catch(_){
-  await finishReservedFollowup(crm,taskId,{status:"uncertain"});
-  return {outcome:"needs-reconciliation"};
+  // Provider already accepted: retain its ID for operator reconciliation.
+  // Do not overwrite with "uncertain" or make another provider request.
+  return {outcome:"needs-reconciliation",providerId:receipt.providerId};
  }
 }
 module.exports={deliverControlledCrmTest,requireManualTestEnvironment,TEST_INBOX,TEST_SOURCE,TEST_JOB};
