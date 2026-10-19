@@ -11,6 +11,7 @@ describe("disabled CRM email deployment preparation",()=>{
   expect(run.stdout).toContain("PLAN ONLY");
   expect(run.stdout).toContain("rental-crm-email-test-staging");
   expect(run.stdout).toContain("CRM_EMAIL_TEST_ENABLED=false");
+  expect(run.stdout).toContain("CRM_DATABASE=rental-email-staging");
   expect(run.stdout).toContain("--max-retries=0");
   expect(run.stdout).toContain("--tasks=1");
   expect(run.stdout).toContain("--parallelism=1");
