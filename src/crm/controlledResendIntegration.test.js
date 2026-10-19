@@ -23,7 +23,7 @@ async function fixture(overrides={}) {
 function env(taskId, overrides={}) {
   return {
     CLOUD_RUN_JOB:TEST_JOB, GOOGLE_CLOUD_PROJECT:"altruistic-platform",
-    CRM_SCOPE:"rental-staging", CRM_BACKEND:"firestore",
+    CRM_SCOPE:"rental-staging", CRM_BACKEND:"firestore", CRM_DATABASE:"rental-email-staging",
     CRM_EMAIL_TEST_ENABLED:"true",
     CRM_EMAIL_TEST_APPROVAL:"SEND_ONE_CRM_TEST_EMAIL",
     CRM_EMAIL_TEST_TO:TEST_INBOX, CRM_EMAIL_TEST_TASK_ID:taskId,
@@ -48,6 +48,7 @@ describe("controlled CRM Resend integration",()=>{
     ["project",{GOOGLE_CLOUD_PROJECT:"wrong-project"}],
     ["scope",{CRM_SCOPE:"production"}],
     ["backend",{CRM_BACKEND:"memory"}],
+    ["database",{CRM_DATABASE:"(default)"}],
     ["enabled",{CRM_EMAIL_TEST_ENABLED:"false"}],
     ["approval",{CRM_EMAIL_TEST_APPROVAL:"NO"}],
     ["recipient",{CRM_EMAIL_TEST_TO:"external@example.test"}],
