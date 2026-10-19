@@ -60,6 +60,8 @@ async function generateFollowupTasks(crm, { now = new Date(), scope = crm.scope 
       status: route === "autonomous" ? "ready-for-automatic-delivery" : "pending-approval",
       approved: false,
       routing: route,
+      engagementStage: engagement.stage,
+      engagementUpdatedAt: engagement.updatedAt,
       source: "scheduler",
       policyVersion: POLICY_VERSION,
       draft: draftFor(engagement),
