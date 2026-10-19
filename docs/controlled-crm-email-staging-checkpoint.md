@@ -45,3 +45,28 @@ npm run build
 ```
 
 All Jest network transports are mocked. No cloud credentials or live Resend API calls are required by these tests.
+
+## Prepared deployment script (not deployed)
+
+`scripts/deploy-controlled-crm-email-staging.sh` is available in the feature branch. It has **three modes**:
+
+- `--plan`: prints proposed CLI arguments without touching Google Cloud.
+- `--preflight`: read-only Git, GCP project, identity and job-absence checks.
+- `--deploy`: creates the isolated disabled-by-default Cloud Run job **only after** a separate human authorization and an explicit approval environment variable. Do not use without approval.
+
+The prepared configuration targets `rental-crm-email-test-staging` in `us-east5` using `rental-email-staging@altruistic-platform.iam.gserviceaccount.com`, **one task**, **one parallel worker**, **zero retries**, `CRM_EMAIL_TEST_ENABLED=false`, and **no attached secrets**. It does not schedule or execute a job, nor grant roles. The script refuses to overwrite an existing job without manual review. This is a repository-side design, not evidence the current live IAM or Cloud Run state matches it.
+
+### Read-only preparation commands
+
+```bash
+git fetch origin
+git merge --ff-only origin/feature/crm-platform-mvp
+bash scripts/deploy-controlled-crm-email-staging.sh --plan
+bash scripts/deploy-controlled-crm-email-staging.sh --preflight
+```
+
+Do not run `--deploy` until explicitly approved in a separate checkpoint. Before deployment confirm that the CLI arguments are supported in the installed gcloud version, that the identity has the required minimum Firestore access, and that the job-name collision check reflects actual Cloud Run state. **Firestore IAM is not equivalent to collection/path-level authorization**; `rental-staging` is a logical application boundary inside the default database, not a database-isolated IAM boundary. A separate staging Firestore database/project or other stronger isolation may be needed before wider automation.
+
+### Real email testing remains a different approval
+
+Deployment alone does not mount `RESEND_API_KEY` or enable email delivery. Any future email execution requires a separately reviewed secret attachment/configuration, intentional enabled override and explicit authorization for one approved owner inbox. Do not grant access to the existing scheduler or production chatbot.
