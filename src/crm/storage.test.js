@@ -66,6 +66,9 @@ describe("Firestore REST persistence adapter", () => {
 });
 
 describe("named Firestore database configuration", () => {
+  const originalFetch = globalThis.fetch;
+  beforeAll(() => { globalThis.fetch = jest.fn(); });
+  afterAll(() => { globalThis.fetch = originalFetch; });
   const settings = { CRM_BACKEND: "firestore", CRM_SCOPE: "rental-staging", GOOGLE_CLOUD_PROJECT: "altruistic-platform" };
   test("default database is retained when no setting is provided", () => {
     const store = makeStore(settings);
