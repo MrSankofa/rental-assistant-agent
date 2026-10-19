@@ -54,14 +54,14 @@ async function reserveAutomaticFollowup(crm,taskId,{now=new Date()}={}){
   return {reserved:true,taskId,idempotencyKey:next.delivery.idempotencyKey};
 }
 // Call immediately before submitting a provider request. Does not send.
-async function checkReservedFollowup(crm,taskId){
+async function checkReservedFollowup(crm,taskId,{now=new Date()}={}){
   requireStaging(crm);
   const row=await crm.store.get("tasks",taskId);
   if(!row||row.value.status!=="delivery-reserved"||row.value.delivery?.status!=="reserved")
     return {valid:false,reason:"not-reserved"};
   const {engagement,contact}=await readContext(crm,row.value);
   const prior={...row.value,status:"ready-for-automatic-delivery"};
-  const stillValid=messageEligible(prior,engagement,contact)&&
+  const stillValid=messageEligible(prior,engagement,contact,new Date(now).getTime())&&
     row.value.delivery.fingerprint===fingerprint(prior,contact);
   return {valid:stillValid,reason:stillValid?"valid":"contact-or-stage-changed"};
 }
