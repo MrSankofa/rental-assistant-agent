@@ -48,7 +48,7 @@ deploy_command=(
   --service-account="$SERVICE_ACCOUNT"
   --command=/cnb/lifecycle/launcher
   --args=node,scripts/send-controlled-crm-email-test.js
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT,CRM_BACKEND=firestore,CRM_SCOPE=rental-staging,CRM_EMAIL_TEST_ENABLED=false"
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT,CRM_BACKEND=firestore,CRM_SCOPE=rental-staging,CRM_DATABASE=rental-email-staging,CRM_EMAIL_TEST_ENABLED=false"
   --clear-secrets
   --tasks=1
   --parallelism=1
