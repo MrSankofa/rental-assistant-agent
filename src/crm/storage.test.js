@@ -1,4 +1,4 @@
-const { FirestoreStore, StoreConflict } = require("./storage");
+const { FirestoreStore, StoreConflict, makeStore } = require("./storage");
 
 function response(status, body = {}) {
   return { status, ok: status >= 200 && status < 300, json: async () => body };
@@ -62,5 +62,32 @@ describe("Firestore REST persistence adapter", () => {
     expect(() => new FirestoreStore({ projectId, scope, fetchFn: null })).toThrow(
       "Firestore requires Node.js 18 or newer"
     );
+  });
+});
+
+describe("named Firestore database configuration", () => {
+  const settings = { CRM_BACKEND: "firestore", CRM_SCOPE: "rental-staging", GOOGLE_CLOUD_PROJECT: "altruistic-platform" };
+  test("default database is retained when no setting is provided", () => {
+    const store = makeStore(settings);
+    expect(store.databaseId).toBe("(default)");
+    expect(store.base).toContain("/databases/(default)/documents/scopes/rental-staging");
+  });
+  test("named database is selected for all REST collection and document paths", () => {
+    const store = makeStore({ ...settings, CRM_DATABASE: "rental-email-staging" });
+    expect(store.databaseId).toBe("rental-email-staging");
+    expect(store.path("contacts", "c_1234567890abcdef"))
+      .toBe("https://firestore.googleapis.com/v1/projects/altruistic-platform/databases/rental-email-staging/documents/scopes/rental-staging/contacts/c_1234567890abcdef");
+  });
+  test.each(["", "(default)/documents", "../escape", "UPPERCASE", "a", "a?query=1", "a%2fb", null])(
+    "rejects explicitly invalid CRM_DATABASE %p", (database) => {
+      expect(() => makeStore({ ...settings, CRM_DATABASE: database }))
+        .toThrow("Invalid Firestore database ID");
+    }
+  );
+  test("emulator uses selected database without changing project or scope", () => {
+    const store = new FirestoreStore({projectId: "altruistic-platform",
+      scope: "rental-staging", databaseId: "rental-email-staging",
+      emulatorHost: "localhost:8080", fetchFn: jest.fn()});
+    expect(store.base).toBe("http://localhost:8080/v1/projects/altruistic-platform/databases/rental-email-staging/documents/scopes/rental-staging");
   });
 });
