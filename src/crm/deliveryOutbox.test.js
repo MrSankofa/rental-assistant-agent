@@ -19,7 +19,7 @@ test("claim exactly once and persist accepted Resend provider receipt",async()=>
   reserveAutomaticFollowup(crm,task.id,{now}),
   reserveAutomaticFollowup(crm,task.id,{now})]);
  expect([first.reserved,second.reserved].filter(Boolean)).toHaveLength(1);
- expect((await checkReservedFollowup(crm,task.id)).valid).toBe(true);
+ expect((await checkReservedFollowup(crm,task.id,{now})).valid).toBe(true);
  expect((await finishReservedFollowup(crm,task.id,{status:"accepted",providerId:"email_001"})).updated).toBe(true);
  expect((await crm.store.get("tasks",task.id)).value.delivery.providerId).toBe("email_001");
  expect((await reserveAutomaticFollowup(crm,task.id,{now})).reserved).toBe(false);
@@ -36,7 +36,7 @@ test("opt out and stage change invalidate claim before provider submission",asyn
  await reserveAutomaticFollowup(crm,task.id,{now});
  const row=await crm.store.get("contacts",result.contactId);
  await crm.store.replace("contacts",result.contactId,{...row.value,optedOutAt:new Date().toISOString()},row.version);
- expect((await checkReservedFollowup(crm,task.id)).valid).toBe(false);
+ expect((await checkReservedFollowup(crm,task.id,{now})).valid).toBe(false);
 });
 test("rejects other CRM scope and no-email-consent",async()=>{
  const {crm,task,now}=await fixture();
