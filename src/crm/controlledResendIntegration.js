@@ -12,6 +12,7 @@ function requireManualTestEnvironment(crm,env,taskId){
  if(!crm||crm.scope!=="rental-staging"||env.CLOUD_RUN_JOB!==TEST_JOB||
     env.GOOGLE_CLOUD_PROJECT!=="altruistic-platform"||
     env.CRM_SCOPE!=="rental-staging"||env.CRM_BACKEND!=="firestore"||
+    env.CRM_DATABASE!=="rental-email-staging"||
     env.CRM_EMAIL_TEST_ENABLED!=="true"||
     env.CRM_EMAIL_TEST_APPROVAL!=="SEND_ONE_CRM_TEST_EMAIL"||
     env.CRM_EMAIL_TEST_TO!==TEST_INBOX||env.CRM_EMAIL_TEST_TASK_ID!==taskId||
