@@ -70,3 +70,15 @@ Do not run `--deploy` until explicitly approved in a separate checkpoint. Before
 ### Real email testing remains a different approval
 
 Deployment alone does not mount `RESEND_API_KEY` or enable email delivery. Any future email execution requires a separately reviewed secret attachment/configuration, intentional enabled override and explicit authorization for one approved owner inbox. Do not grant access to the existing scheduler or production chatbot.
+
+## 2026-10-19 database-isolation code update (code only)
+
+The actual dedicated Cloud Run job has already been deployed and dry-run successfully with `CRM_EMAIL_TEST_ENABLED=false`. Its **deployed** configuration still targets `(default)`; these new GitHub changes are **not deployed**.
+
+- `FirestoreStore` now accepts `databaseId`, sourced from `CRM_DATABASE`, validates it, and uses it in Firestore REST URLs. Unset `CRM_DATABASE` retains `(default)` for existing services.
+- The **enabled** manual CRM-to-Resend path refuses to run unless `CRM_DATABASE=rental-email-staging`. Empty, malformed or missing database selections cannot silently fall back for that sender.
+- The repository deployment plan now includes `CRM_DATABASE=rental-email-staging`. Its collision check intentionally refuses to overwrite the already deployed Cloud Run job; any future job revision requires separate review and approval.
+- Regression tests verify legacy defaults, new database routing, invalid names, the sender's denial behavior, and the new disabled-job plan.
+- **Not yet performed:** create the named Firestore database, inspect/grant conditional database-specific IAM, change/redeploy the Cloud Run job, access data, attach Resend secrets, or send a real email.
+
+We should not authorize the next cloud step until the named database design, least-privilege IAM conditions, rollback, and the existing staging dashboard's visibility into `(default)` have been reviewed. Database-level IAM isolation does not imply collection-level isolation.
