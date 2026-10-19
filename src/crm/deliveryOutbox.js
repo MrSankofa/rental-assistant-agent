@@ -83,4 +83,19 @@ async function finishReservedFollowup(crm,taskId,{status,providerId}){
     row.value.engagementId,{taskId,providerId:status==="accepted"?providerId:null});
   return {updated:true,status};
 }
-module.exports={FROM,messageEligible,reserveAutomaticFollowup,checkReservedFollowup,finishReservedFollowup};
+// A rejected recheck must explicitly hand off to staff; never contact the provider.
+async function cancelReservedFollowup(crm,taskId,{reason="state-changed"}={}){
+  requireStaging(crm);
+  const row=await crm.store.get("tasks",taskId);
+  if(!row||row.value.status!=="delivery-reserved"||row.value.delivery?.status!=="reserved")
+    return {updated:false,reason:"not-reserved"};
+  const next={...row.value,status:"pending-approval",routing:"staff-review",
+    updatedAt:new Date().toISOString(),
+    delivery:{...row.value.delivery,status:"not-sent",providerId:null,
+      canceledAt:new Date().toISOString(),reason}};
+  try{await crm.store.replace("tasks",taskId,next,row.version);}
+  catch(error){if(error instanceof StoreConflict)return {updated:false,reason:"concurrent-change"};throw error;}
+  await crm.audit("system","automatic-email-handoff",row.value.engagementId,{taskId,reason});
+  return {updated:true,status:"pending-approval"};
+}
+module.exports={FROM,messageEligible,reserveAutomaticFollowup,checkReservedFollowup,finishReservedFollowup,cancelReservedFollowup};
