@@ -1,13 +1,14 @@
 "use strict";
 // Read-only validator for the currently deployed, disabled CRM staging job.
-// This validates the ORIGINAL job before a separately approved revision.
+// This validates the latest owner-verified DISABLED job before a separately approved revision.
 const fs = require("node:fs");
 
 const JOB = "rental-crm-email-test-staging";
 const ACCOUNT = "rental-email-staging@altruistic-platform.iam.gserviceaccount.com";
-const IMAGE = "us-east5-docker.pkg.dev/altruistic-platform/cloud-run-source-deploy/rental-crm-email-test-staging@sha256:26c66b4e6d6d1d747455ca635b9752c91ae5be3bf83b0df74d996b71f05940a5";
+const IMAGE = "us-east5-docker.pkg.dev/altruistic-platform/cloud-run-source-deploy/rental-crm-email-test-staging@sha256:33a9e31da7619fdf09d386c0f4c13db9980bf368971e2e3444ea9440753f3970";
 const EXPECTED_ENV = {
   CRM_BACKEND: "firestore",
+  CRM_DATABASE: "rental-email-staging",
   CRM_EMAIL_TEST_ENABLED: "false",
   CRM_SCOPE: "rental-staging",
   GOOGLE_CLOUD_PROJECT: "altruistic-platform"
