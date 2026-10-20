@@ -82,3 +82,16 @@ The actual dedicated Cloud Run job has already been deployed and dry-run success
 - **Not yet performed:** create the named Firestore database, inspect/grant conditional database-specific IAM, change/redeploy the Cloud Run job, access data, attach Resend secrets, or send a real email.
 
 We should not authorize the next cloud step until the named database design, least-privilege IAM conditions, rollback, and the existing staging dashboard's visibility into `(default)` have been reviewed. Database-level IAM isolation does not imply collection-level isolation.
+
+## 2026-10-20 isolated Firestore and read-only job revision plan
+
+Live GCP state verified by the owner: `rental-email-staging` Firestore Native Standard database created in `us-east5` with delete protection; conditional `roles/datastore.user` project IAM grant applied to dedicated email staging service account with `resource.name=="projects/altruistic-platform/databases/rental-email-staging"`. IAM Troubleshooter rejected the attempted resource-name input; **effective access remains unverified**. An inline job execution override failed before making successful database checks. The existing Cloud Run job is still configured with `CRM_EMAIL_TEST_ENABLED=false` and previously completed a disabled dry run; no sending is approved.
+
+Files:
+- `scripts/check-firestore-access.js`: manually launched read-only Firestore test; obtains service account token inside the existing job and GETs a nonexistent document in each database, expecting 404 on named staging and 403 on default. Never executed successfully in cloud yet.
+- `scripts/verify-existing-controlled-crm-job.js`: validates existing job JSON against the original reviewed image, identity, command, arguments, disabled email setting, no secret references, and zero retries. Stops on unexpected configuration.
+- `scripts/plan-controlled-crm-job-revision.sh --plan`: prints proposed revision; no GCP calls or changes.
+- `scripts/plan-controlled-crm-job-revision.sh --preflight`: read-only Cloud Run job inspect + exact baseline validation; requires clean up-to-date feature branch.
+- `scripts/plan-controlled-crm-job-revision.test.js`: safe configuration and fail-closed regression checks.
+
+**No deployment mode is provided in the revision planning script.** Existing `scripts/deploy-controlled-crm-email-staging.sh` creates new jobs only and will refuse an existing target: do not use it to update this job. Revision deployment, diagnostic execution, a Resend key attachment, and any real email each need separate approvals. Confirm image provenance, review the current live job (image SHA pinned to last owner's output), and maintain disabled settings before authorizing any job revision. For a later approved diagnostic, use the checked-in script with an explicitly reviewed execution command, not inline JavaScript.
