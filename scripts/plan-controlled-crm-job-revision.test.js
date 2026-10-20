@@ -4,7 +4,7 @@ const path = require("node:path");
 const {spawnSync} = require("node:child_process");
 const {verifyExistingJob} = require("./verify-existing-controlled-crm-job");
 const plan = path.join(__dirname, "plan-controlled-crm-job-revision.sh");
-const image = "us-east5-docker.pkg.dev/altruistic-platform/cloud-run-source-deploy/rental-crm-email-test-staging@sha256:26c66b4e6d6d1d747455ca635b9752c91ae5be3bf83b0df74d996b71f05940a5";
+const image = "us-east5-docker.pkg.dev/altruistic-platform/cloud-run-source-deploy/rental-crm-email-test-staging@sha256:33a9e31da7619fdf09d386c0f4c13db9980bf368971e2e3444ea9440753f3970";
 function job() {
  return {metadata:{name:"rental-crm-email-test-staging"},
  spec:{template:{spec:{taskCount:1,parallelism:1,template:{spec:{
@@ -14,6 +14,7 @@ function job() {
    args:["node","scripts/send-controlled-crm-email-test.js"],
    env:[
     {name:"CRM_BACKEND",value:"firestore"},
+    {name:"CRM_DATABASE",value:"rental-email-staging"},
     {name:"CRM_EMAIL_TEST_ENABLED",value:"false"},
     {name:"CRM_SCOPE",value:"rental-staging"},
     {name:"GOOGLE_CLOUD_PROJECT",value:"altruistic-platform"}
@@ -24,7 +25,7 @@ test("expected existing job is accepted",()=>expect(verifyExistingJob(job())).to
 test.each([
  ["enabled email",j=>j.spec.template.spec.template.spec.containers[0].env[1].value="true"],
  ["secret attached",j=>j.spec.template.spec.template.spec.containers[0].env.push({name:"API",valueFrom:{secretKeyRef:{name:"secret"}}})],
- ["wrong database",j=>j.spec.template.spec.template.spec.containers[0].env.push({name:"CRM_DATABASE",value:"(default)"})],
+ ["wrong database",j=>j.spec.template.spec.template.spec.containers[0].env[1].value="(default)"],
  ["wrong image",j=>j.spec.template.spec.template.spec.containers[0].image="unexpected"],
  ["wrong entrypoint",j=>j.spec.template.spec.template.spec.containers[0].args=["node","scripts/check-firestore-access.js"]],
  ["other service account",j=>j.spec.template.spec.template.spec.serviceAccountName="other"],
