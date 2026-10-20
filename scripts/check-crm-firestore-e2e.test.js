@@ -85,3 +85,19 @@ test("unrelated or altered records are never deleted during cleanup", async () =
   })).rejects.toThrow("manual reconciliation");
   expect(deleteFn).not.toHaveBeenCalled();
 });
+
+test("unacknowledged creation cannot be certified clean after an empty read", async () => {
+  const { store, deleteFn } = memoryHarness();
+  const actualCreate = store.create.bind(store);
+  store.create = async (collection, id, value) => {
+    if (collection === "contacts") throw Error("ambiguous network failure");
+    return actualCreate(collection, id, value);
+  };
+  const log = jest.fn();
+  await expect(run({
+    env, uuid: () => id, storeFactory: () => store, deleteFn, log
+  })).rejects.toThrow("inconclusive");
+  expect(log).toHaveBeenCalledWith("CRM_E2E_MANUAL_RECONCILIATION_REQUIRED", expectedScope);
+  expect(log).not.toHaveBeenCalledWith("CRM_E2E_VERIFIED");
+  expect(store.rows.size).toBe(0);
+});
