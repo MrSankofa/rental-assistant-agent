@@ -44,9 +44,12 @@ function trackWrites(store, scope) {
         !value || typeof value !== "object" || value.id !== id) {
       throw Error("Unexpected CRM E2E write");
     }
-    attempted.push({ collection, id }); // Record BEFORE attempting the network write.
+    // Unacknowledged creates remain ambiguous, even if immediate reads return 404.
+    const attempt = { collection, id, confirmed: false };
+    attempted.push(attempt); // Record BEFORE attempting the network write.
     const created = await create(collection, id, { ...value, e2eProbeScope: scope });
     if (!created) throw Error("CRM E2E document collision");
+    attempt.confirmed = true;
     return created;
   };
   store.replace = async (collection, id, value, version) => {
@@ -67,7 +70,8 @@ async function deleteDocument({ store, collection, id, version }) {
   if (response.status !== 200) throw Error("CRM E2E delete unconfirmed");
 }
 async function cleanup({ store, attempted, scope, deleteFn = deleteDocument }) {
-  let failed = false;
+  // Do not certify cleanup after an ambiguous create, even if records look absent.
+  let failed = attempted.some(attempt => attempt.confirmed !== true);
   const visited = new Set();
   for (const { collection, id } of [...attempted].reverse()) {
     const key = collection + "/" + id;
