@@ -75,9 +75,10 @@ test("unrelated or altered records are never deleted during cleanup", async () =
   const attempted = trackWrites(store, expectedScope);
   await store.create("tasks", "task12345", { id: "task12345" });
   const row = await store.get("tasks", "task12345");
-  await store.replace("tasks", "task12345", {
-    ...row.value, e2eProbeScope: "another-probe"
-  }, row.version);
+  // Simulate an external mutation that the guarded store wrapper would reject.
+  store.rows.set(store.key("tasks", "task12345"), {
+    value: { ...row.value, e2eProbeScope: "another-probe" }, version: Number(row.version) + 1
+  });
   const deleteFn = jest.fn();
   await expect(cleanup({
     store, attempted, scope: expectedScope, deleteFn
