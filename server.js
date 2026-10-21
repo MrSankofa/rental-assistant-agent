@@ -11,6 +11,8 @@ const { generateFollowupTasks } = require("./src/crm/followups");
 const { prepareDraft, editDraft, approveAndSend, deliveryMode } = require("./src/crm/messaging");
 const { staffEnabled, summarizeDashboard } = require("./src/crm/staff");
 const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
+const { stagingNextSteps } = require("./src/crm/prospectJourney");
+const { getPropertyInformation } = require("./dist/agent/tools");
 const crypto = require("crypto");
 const crmStore = makeStore();
 const crm = crmStore ? new CRM(crmStore, process.env.CRM_SCOPE || "rental-mvp") : null;
@@ -228,6 +230,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     sendJson(res,404,{error:"Not found"});return;
+  }
+
+  // Publicly readable only when explicitly in fictional staging; never creates a booking.
+  if (req.method === "GET" && pathname === "/api/crm/staging-next-steps") {
+    if (!crmPublicIntakeEnabled) { sendJson(res,404,{error:"Not found"}); return; }
+    sendJson(res,200,stagingNextSteps("ziegler",getPropertyInformation));
+    return;
   }
 
   if (req.method === "GET" && pathname === "/api/crm/status") {
