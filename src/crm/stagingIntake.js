@@ -8,7 +8,9 @@ function stagingIntakeEnabled(env, crmConfigured) {
     env.CRM_STAGING_TEST_MODE === "true" &&
     env.CRM_PUBLIC_INTAKE_ENABLED === "true" &&
     env.CRM_BACKEND === "firestore" &&
+    env.CRM_DATABASE === "rental-email-staging" &&
     env.CRM_SCOPE === "rental-staging" &&
+    env.GOOGLE_CLOUD_PROJECT === "altruistic-platform" &&
     typeof env.PUBLIC_ORIGIN === "string" &&
     /^https:\/\/[a-z0-9.-]+\.cloudshell\.dev$/.test(env.PUBLIC_ORIGIN)
   );
