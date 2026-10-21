@@ -3,6 +3,7 @@ function staffEnabled(env) {
   return env.K_SERVICE === "rental-assistant-staff-staging" &&
     env.CRM_STAFF_ENABLED === "true" &&
     env.CRM_BACKEND === "firestore" &&
+    env.CRM_DATABASE === "rental-email-staging" &&
     env.CRM_SCOPE === "rental-staging" &&
     env.GOOGLE_CLOUD_PROJECT === "altruistic-platform";
 }
