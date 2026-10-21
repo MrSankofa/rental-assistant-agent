@@ -189,6 +189,13 @@
     </form>
   </section>
 
+  <section id="showingNextStep" hidden class="guide" aria-labelledby="showingNextHeading">
+    <h2 id="showingNextHeading">Next step: schedule your showing</h2>
+    <p>Your fictional inquiry is saved for staff review. To request an actual showing time, use the verified Calendly link below. Opening the link is not a booking; complete the Calendly process to reserve a time.</p>
+    <a id="showingNextLink" target="_blank" rel="noopener noreferrer">Continue to Calendly scheduling</a>
+    <p>Staging does not automatically record or confirm Calendly reservations in the CRM.</p>
+  </section>
+
   <script src="/assets/suggested-questions.js"></script>
   <script>
 
@@ -242,7 +249,27 @@
         });
         const result = await response.json();
         if(!response.ok) throw new Error(result.error || "Unable to submit");
-        status.textContent = "Your inquiry was received. Thank you.";
+        status.textContent = "Your inquiry was received for staff review. No showing has been booked yet.";
+        const nextSection = document.getElementById("showingNextStep");
+        const nextLink = document.getElementById("showingNextLink");
+        nextSection.hidden = true;
+        nextLink.removeAttribute("href");
+        try {
+          const nextResponse = await fetch("/api/crm/staging-next-steps", {cache:"no-store"});
+          if (nextResponse.ok) {
+            const steps = await nextResponse.json();
+            if (steps.showingAvailable && steps.propertyId === "ziegler" &&
+                steps.bookingRecorded === false && typeof steps.showingUrl === "string") {
+              const verified = new URL(steps.showingUrl);
+              if (verified.protocol === "https:" && verified.hostname === "calendly.com") {
+                nextLink.href = verified.href;
+                nextSection.hidden = false;
+              }
+            }
+          }
+        } catch (_) {
+          // An unavailable showing link must never be replaced with an invented booking.
+        }
         leadForm.reset();
       } catch(error) {
         status.textContent = "We could not save your inquiry. Please try again or use the property contact link.";
