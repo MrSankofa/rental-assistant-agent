@@ -22,8 +22,8 @@ Approved future revision proposal:
   - Preserve project, region, service account, one task, one worker,
     zero retries and 120-second timeout.
   - No secrets, IAM mutations, scheduler, job execution or actual email.
-  - Include scripts/check-firestore-write-access.js in the new container image.
-  - Verify live revision before separately approving a read-only probe.
+  - Include scripts/check-crm-firestore-e2e.js in the new container image.
+  - Verify live revision before separately approving a write-capable CRM E2E probe.
 NO deploy command is implemented here. A separate explicit approval and
 reviewed update command are required to change the existing Cloud Run job.
 PLAN
@@ -40,7 +40,7 @@ cd "$ROOT"
 [[ -z "$(git status --porcelain)" ]] || fail "dirty working tree"
 [[ "$(git rev-parse HEAD)" == "$(git rev-parse "origin/$BRANCH")" ]] ||
   fail "HEAD does not match fetched origin"
-[[ -f scripts/check-firestore-write-access.js ]] || fail "write probe missing"
+[[ -f scripts/check-crm-firestore-e2e.js ]] || fail "CRM E2E probe missing"
 gcloud run jobs describe "$JOB" --project="$PROJECT" --region="$REGION" --format=json |
   node scripts/verify-existing-controlled-crm-job.js ||
   fail "existing job differs from reviewed configuration"
