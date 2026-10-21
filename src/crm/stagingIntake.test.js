@@ -4,6 +4,8 @@ const env = {
   CRM_STAGING_TEST_MODE: "true",
   CRM_PUBLIC_INTAKE_ENABLED: "true",
   CRM_BACKEND: "firestore",
+  CRM_DATABASE: "rental-email-staging",
+  GOOGLE_CLOUD_PROJECT: "altruistic-platform",
   CRM_SCOPE: "rental-staging",
   PUBLIC_ORIGIN: "https://8080-cs-example-default.cs-us-east1.cloudshell.dev"
 };
@@ -21,6 +23,7 @@ describe("private staging intake security", () => {
       expect(stagingIntakeEnabled({...env,[key]:""},true)).toBe(false);
     }
     expect(stagingIntakeEnabled({...env,K_SERVICE:"rental-assistant"},true)).toBe(false);
+    expect(stagingIntakeEnabled({...env,CRM_DATABASE:"(default)"},true)).toBe(false);
   });
   test("origin required and must match the exact Cloud Shell preview origin", () => {
     expect(requireStagingOrigin(env.PUBLIC_ORIGIN,env.PUBLIC_ORIGIN)).toBe(true);
