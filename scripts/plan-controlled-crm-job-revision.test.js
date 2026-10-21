@@ -40,7 +40,7 @@ test("revision plan has no cloud writes and does not provide deployment mode",()
  expect(run.stdout).toContain("NO CLOUD MUTATIONS");
  expect(run.stdout).toContain("CRM_EMAIL_TEST_ENABLED=false");
  expect(run.stdout).toContain("CRM_DATABASE=rental-email-staging");
- expect(run.stdout).toContain("scripts/check-firestore-write-access.js");
+ expect(run.stdout).toContain("scripts/check-crm-firestore-e2e.js");
  expect(fs.readFileSync(plan,"utf8")).not.toMatch(/gcloud run jobs (deploy|update|execute)/);
  const denied=spawnSync("bash",[plan,"--deploy"],{encoding:"utf8"});
  expect(denied.status).not.toBe(0);
