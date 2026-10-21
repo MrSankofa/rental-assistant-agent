@@ -5,7 +5,7 @@ const fs = require("node:fs");
 
 const JOB = "rental-crm-email-test-staging";
 const ACCOUNT = "rental-email-staging@altruistic-platform.iam.gserviceaccount.com";
-const IMAGE = "us-east5-docker.pkg.dev/altruistic-platform/cloud-run-source-deploy/rental-crm-email-test-staging@sha256:33a9e31da7619fdf09d386c0f4c13db9980bf368971e2e3444ea9440753f3970";
+const IMAGE = "us-east5-docker.pkg.dev/altruistic-platform/cloud-run-source-deploy/rental-crm-email-test-staging@sha256:84f2bc84cae2c61640f61fb4fb19d5151a5d5724353b57985eb9fa46c42db4be";
 const EXPECTED_ENV = {
   CRM_BACKEND: "firestore",
   CRM_DATABASE: "rental-email-staging",
