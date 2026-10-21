@@ -1,9 +1,10 @@
 const {staffEnabled,summarizeDashboard}=require("./staff");
-const env={K_SERVICE:"rental-assistant-staff-staging",CRM_STAFF_ENABLED:"true",CRM_BACKEND:"firestore",CRM_SCOPE:"rental-staging",GOOGLE_CLOUD_PROJECT:"altruistic-platform"};
+const env={K_SERVICE:"rental-assistant-staff-staging",CRM_STAFF_ENABLED:"true",CRM_BACKEND:"firestore",CRM_DATABASE:"rental-email-staging",CRM_SCOPE:"rental-staging",GOOGLE_CLOUD_PROJECT:"altruistic-platform"};
 test("staff service is disabled outside dedicated Cloud Run staging identity",()=>{
  expect(staffEnabled(env)).toBe(true);
  for(const k of Object.keys(env)) expect(staffEnabled({...env,[k]:""})).toBe(false);
  expect(staffEnabled({...env,K_SERVICE:"rental-assistant-staging"})).toBe(false);
+ expect(staffEnabled({...env,CRM_DATABASE:"(default)"})).toBe(false);
 });
 test("dashboard joins contact and engagement and never adds delivery capability",()=>{
  const d=summarizeDashboard([{id:"c1",name:"Fictional Browser",email:"a@example.test",consent:{recording:true}}],
