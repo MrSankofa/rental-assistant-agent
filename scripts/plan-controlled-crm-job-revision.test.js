@@ -4,7 +4,7 @@ const path = require("node:path");
 const {spawnSync} = require("node:child_process");
 const {verifyExistingJob} = require("./verify-existing-controlled-crm-job");
 const plan = path.join(__dirname, "plan-controlled-crm-job-revision.sh");
-const image = "us-east5-docker.pkg.dev/altruistic-platform/cloud-run-source-deploy/rental-crm-email-test-staging@sha256:33a9e31da7619fdf09d386c0f4c13db9980bf368971e2e3444ea9440753f3970";
+const image = "us-east5-docker.pkg.dev/altruistic-platform/cloud-run-source-deploy/rental-crm-email-test-staging@sha256:84f2bc84cae2c61640f61fb4fb19d5151a5d5724353b57985eb9fa46c42db4be";
 function job() {
  return {metadata:{name:"rental-crm-email-test-staging"},
  spec:{template:{spec:{taskCount:1,parallelism:1,template:{spec:{
@@ -23,7 +23,7 @@ function job() {
 }
 test("expected existing job is accepted",()=>expect(verifyExistingJob(job())).toBe(true));
 test.each([
- ["enabled email",j=>j.spec.template.spec.template.spec.containers[0].env[1].value="true"],
+ ["enabled email",j=>j.spec.template.spec.template.spec.containers[0].env[2].value="true"],
  ["secret attached",j=>j.spec.template.spec.template.spec.containers[0].env.push({name:"API",valueFrom:{secretKeyRef:{name:"secret"}}})],
  ["wrong database",j=>j.spec.template.spec.template.spec.containers[0].env[1].value="(default)"],
  ["wrong image",j=>j.spec.template.spec.template.spec.containers[0].image="unexpected"],
