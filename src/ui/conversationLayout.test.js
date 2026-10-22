@@ -9,10 +9,14 @@ test("welcome choices are presented as the assistant's own chat content",()=>{
 });
 test("followup form lives in transcript and stays hidden until requested",()=>{
  expect(html).toMatch(/id="messages"[\s\S]*id="contactIntake"[^>]*hidden/);
- expect(html).toContain("messages.appendChild(contactIntake)");
+ expect(html).toContain('id="contactIntakeTurn" class="chat-turn assistant" hidden');
+ expect(html).toContain("messages.appendChild(contactIntakeTurn)");
+ expect(html).toContain('contactIntakeTurn.hidden = false');
  expect(html).toContain('contactIntake.hidden = false');
  expect(html).toContain('followUpJump.hidden = false');
  expect(html).toContain('contactIntake.hidden = true');
+ expect(html).toContain('contactIntakeTurn.hidden = true');
+ expect(html).toContain("messages.appendChild(showingNextTurn)");
 });
 test("real inquiries keep explicit consent, verification and privacy controls",()=>{
  for(const item of ["name=\"recording\" required","name=\"emailConsent\"",
