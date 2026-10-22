@@ -216,6 +216,8 @@
 
     const followUpJump = document.getElementById("followUpJump");
     const contactIntake = document.getElementById("contactIntake");
+    const contactIntakeTurn = document.getElementById("contactIntakeTurn");
+    const showingNextTurn = document.getElementById("showingNextTurn");
     const leadForm = document.getElementById("leadForm");
     const propertySelect = leadForm.elements.namedItem("targetId");
     const messages = document.getElementById("messages");
@@ -224,8 +226,9 @@
       if (contactIntake.hidden) {
         addMessage("I'd like staff to follow up with me.", "user");
         contactIntake.hidden = false;
+        contactIntakeTurn.hidden = false;
       }
-      messages.appendChild(contactIntake);
+      messages.appendChild(contactIntakeTurn);
       messages.scrollTop = messages.scrollHeight;
       leadForm.elements.namedItem("name").focus({ preventScroll: true });
     });
@@ -336,7 +339,8 @@
               if (verified.protocol === "https:" && verified.hostname === "calendly.com") {
                 nextLink.href = verified.href;
                 nextSection.hidden = false;
-                messages.appendChild(nextSection);
+                showingNextTurn.hidden = false;
+                messages.appendChild(showingNextTurn);
                 messages.scrollTop = messages.scrollHeight;
               }
             }
@@ -346,6 +350,7 @@
         }
         leadForm.reset();
         contactIntake.hidden = true;
+        contactIntakeTurn.hidden = true;
         const notice = document.getElementById("leadStatus");
         notice.textContent = "";
         addMessage("Thank you. Your inquiry has been recorded for staff review. No showing has been booked and no automatic message has been sent.", "assistant");
@@ -387,6 +392,53 @@
     }
     renderSuggestions();
 
+    function createTurn(role, bubble) {
+      const turn = document.createElement("div");
+      turn.className = "chat-turn " + role;
+      const avatar = document.createElement("span");
+      avatar.className = "chat-avatar " + role;
+      avatar.setAttribute("aria-hidden", "true");
+      if (role === "assistant") {
+        const logo = document.createElement("img");
+        logo.src = "/assets/brand/logo-mark-64.png";
+        logo.alt = "";
+        avatar.appendChild(logo);
+      } else {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        for (const [name, attributes] of [
+          ["circle", { cx: "12", cy: "8", r: "3.5" }],
+          ["path", { d: "M4.5 20c.3-4.5 3-6.5 7.5-6.5s7.2 2 7.5 6.5" }]
+        ]) {
+          const child = document.createElementNS("http://www.w3.org/2000/svg", name);
+          for (const [key, value] of Object.entries(attributes)) child.setAttribute(key, value);
+          svg.appendChild(child);
+        }
+        avatar.appendChild(svg);
+      }
+      turn.append(avatar, bubble);
+      return turn;
+    }
+
+    function addTypingIndicator() {
+      const bubble = document.createElement("div");
+      bubble.className = "message assistant typing-bubble";
+      bubble.setAttribute("role", "status");
+      bubble.setAttribute("aria-label", "Rental Assistant is preparing a response");
+      const caption = document.createElement("span");
+      caption.className = "typing-caption";
+      caption.textContent = "Responding";
+      const dots = document.createElement("span");
+      dots.className = "typing-dots";
+      dots.setAttribute("aria-hidden", "true");
+      for (let i = 0; i < 3; i++) dots.appendChild(document.createElement("span"));
+      bubble.append(caption, dots);
+      const turn = createTurn("assistant", bubble);
+      messages.appendChild(turn);
+      messages.scrollTop = messages.scrollHeight;
+      return turn;
+    }
+
     function addMessage(text, role) {
       const div = document.createElement("div");
       div.className = "message " + role;
@@ -420,7 +472,7 @@
         }
       });
 
-      messages.appendChild(div);
+      messages.appendChild(createTurn(role, div));
       messages.scrollTop = messages.scrollHeight;
       return div;
     }
@@ -436,6 +488,7 @@
       input.value = "";
       button.disabled = true;
       renderSuggestions();
+      const typingTurn = addTypingIndicator();
 
       try {
         const response = await fetch("/api/chat", {
@@ -480,6 +533,7 @@
           "assistant"
         );
       } finally {
+        typingTurn.remove();
         button.disabled = false;
         renderSuggestions();
         input.focus();
