@@ -236,7 +236,7 @@ const server = http.createServer(async (req, res) => {
 
   // Publicly readable only when explicitly in fictional staging; never creates a booking.
   if (req.method === "GET" && pathname === "/api/crm/staging-next-steps") {
-    if (!crmPublicIntakeEnabled) { sendJson(res,404,{error:"Not found"}); return; }
+    if (!publicIntakeStatus.publicIntakeEnabled) { sendJson(res,404,{error:"Not found"}); return; }
     sendJson(res,200,stagingNextSteps("ziegler",getPropertyInformation));
     return;
   }
