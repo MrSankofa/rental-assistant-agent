@@ -1,4 +1,4 @@
-const {staffEnabled,summarizeDashboard}=require("./staff");
+const {staffEnabled,summarizeDashboard,legacyAdminEnabled}=require("./staff");
 const env={K_SERVICE:"rental-assistant-staff-staging",CRM_STAFF_ENABLED:"true",CRM_BACKEND:"firestore",CRM_DATABASE:"rental-email-staging",CRM_SCOPE:"rental-staging",GOOGLE_CLOUD_PROJECT:"altruistic-platform"};
 test("staff service is disabled outside dedicated Cloud Run staging identity",()=>{
  expect(staffEnabled(env)).toBe(true);
@@ -48,4 +48,12 @@ test("live summary highlights unreviewed leads and disables delivery",()=>{
   newInquiryCount:1,newestInquiryAt:"2026-10-20T10:00:00Z"
  });
  expect(dashboard.pipeline.map(x=>x.id)).toEqual(["e2","e1"]);
+});
+
+test("legacy admin cannot be enabled for a live-scoped database, even with intake disabled",()=>{
+ expect(legacyAdminEnabled({CRM_DATABASE:"rental-leads-prod",CRM_SCOPE:"rental-live"})).toBe(false);
+ expect(legacyAdminEnabled({CRM_DATABASE:"rental-leads-prod",CRM_REAL_INTAKE_ENABLED:"false"})).toBe(false);
+ expect(legacyAdminEnabled({CRM_SCOPE:"rental-live"})).toBe(false);
+ expect(legacyAdminEnabled({CRM_REAL_STAFF_ENABLED:"true"})).toBe(false);
+ expect(legacyAdminEnabled({CRM_DATABASE:"rental-email-staging",CRM_SCOPE:"rental-staging"})).toBe(true);
 });
