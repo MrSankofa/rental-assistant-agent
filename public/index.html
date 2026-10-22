@@ -160,6 +160,7 @@
   <section id="contactIntake" hidden aria-labelledby="contactHeading" style="background:white;border:1px solid #ddd;border-radius:8px;padding:18px;margin-top:22px">
     <h2 id="contactHeading">Request a follow-up</h2>
     <p id="leadDescription">Private staging demonstration. Use fictional data only. This records a test inquiry; it does not send a message or notify staff.</p>
+    <p id="privacyNotice" hidden>We use the information you provide to respond to your rental inquiry. <a id="privacyLink" target="_blank" rel="noopener noreferrer">Read our privacy notice</a>.</p>
     <form id="leadForm" style="display:grid;gap:12px">
       <label>Name <input name="name" autocomplete="name" required maxlength="100"></label>
       <label>Email <input name="email" type="email" autocomplete="email" maxlength="254"></label>
@@ -191,9 +192,9 @@
 
   <section id="showingNextStep" hidden class="guide" aria-labelledby="showingNextHeading">
     <h2 id="showingNextHeading">Next step: schedule your showing</h2>
-    <p>Your fictional inquiry is saved for staff review. To request an actual showing time, use the verified Calendly link below. Opening the link is not a booking; complete the Calendly process to reserve a time.</p>
+    <p>Your inquiry is recorded for staff review. To request an actual showing time, use the verified Calendly link below. Opening the link is not a booking; complete the Calendly process to reserve a time.</p>
     <a id="showingNextLink" target="_blank" rel="noopener noreferrer">Continue to Calendly scheduling</a>
-    <p>Staging does not automatically record or confirm Calendly reservations in the CRM.</p>
+    <p>The assistant does not automatically record or confirm Calendly reservations in the CRM.</p>
   </section>
 
   <script src="/assets/suggested-questions.js"></script>
@@ -207,6 +208,7 @@
       contactIntake.scrollIntoView({ behavior: "smooth", block: "start" });
       leadForm.elements.namedItem("name").focus({ preventScroll: true });
     });
+    let isLiveIntake = false;
     fetch("/api/crm/status").then(r => r.json()).then(status => {
       if (status.publicIntakeEnabled && status.stagingTestMode) {
         contactIntake.hidden = false;
@@ -221,6 +223,39 @@
         interestField.value = "Tour inquiry";
         interestField.readOnly = true;
         propertySelect.value = "ziegler";
+      } else if (status.publicIntakeEnabled && status.realIntakeEnabled &&
+                 status.stagingTestMode === false &&
+                 status.privacyUrl === "https://altruisticdevelopment.com/privacy/") {
+        isLiveIntake = true;
+        contactIntake.hidden = false;
+        followUpJump.hidden = false;
+        document.getElementById("leadDescription").textContent =
+          "Ask our staff about Ziegler. Your information is recorded so we can respond; submitting this form does not book a showing or send an automatic message.";
+        document.getElementById("privacyLink").href = status.privacyUrl;
+        document.getElementById("privacyNotice").hidden = false;
+        leadForm.elements.namedItem("phone").disabled = true;
+        leadForm.elements.namedItem("phone").value = "";
+        leadForm.elements.namedItem("smsConsent").disabled = true;
+        leadForm.elements.namedItem("smsConsent").checked = false;
+        propertySelect.value = "ziegler";
+        propertySelect.disabled = false;
+        for (const option of propertySelect.options) {
+          if (option.value === "virginia") option.disabled = true;
+        }
+        leadForm.elements.namedItem("preferredChannel").value = "email";
+        for (const option of leadForm.elements.namedItem("preferredChannel").options) {
+          if (option.value !== "email") option.disabled = true;
+        }
+        const interest = leadForm.elements.namedItem("interest");
+        const choice = document.createElement("select");
+        choice.name = "interest";
+        choice.required = true;
+        choice.style.padding = "12px";
+        for (const value of ["Tour inquiry","Application information","General property question"]) {
+          const opt = document.createElement("option"); opt.value = value; opt.textContent = value;
+          choice.appendChild(opt);
+        }
+        interest.replaceWith(choice);
       }
     }).catch(() => {});
 
