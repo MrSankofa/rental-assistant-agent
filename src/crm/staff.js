@@ -30,6 +30,14 @@ function staffEnabled(env) {
   return stagingStaffEnabled(env) || liveStaffEnabled(env);
 }
 
+function legacyAdminEnabled(env) {
+  // Old token-based admin APIs must never read or mutate live prospect records.
+  return env.CRM_DATABASE !== "rental-leads-prod" &&
+    env.CRM_SCOPE !== "rental-live" &&
+    env.CRM_REAL_STAFF_ENABLED !== "true" &&
+    env.CRM_REAL_INTAKE_ENABLED !== "true";
+}
+
 function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disabled", workspace="staging"}={}) {
   const byId = new Map(contacts.map(c => [c.id, c]));
   const pipeline = engagements.map(e => {
@@ -61,4 +69,4 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
     }))
   };
 }
-module.exports={staffEnabled,stagingStaffEnabled,liveStaffEnabled,summarizeDashboard};
+module.exports={staffEnabled,stagingStaffEnabled,liveStaffEnabled,legacyAdminEnabled,summarizeDashboard};
