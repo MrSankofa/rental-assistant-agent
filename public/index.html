@@ -185,7 +185,8 @@
       <label><input type="checkbox" name="recording" required> I agree to have these details recorded to process my inquiry.</label>
       <label><input type="checkbox" name="emailConsent"> I agree to optional email follow-ups (not required).</label>
       <label><input type="checkbox" name="smsConsent"> I agree to optional text follow-ups (not required).</label>
-      <button type="submit">Submit inquiry</button>
+      <div id="humanVerification" hidden></div>
+      <button type="submit" id="submitInquiry">Submit inquiry</button>
       <p id="leadStatus" role="status" aria-live="polite"></p>
     </form>
   </section>
@@ -209,6 +210,9 @@
       leadForm.elements.namedItem("name").focus({ preventScroll: true });
     });
     let isLiveIntake = false;
+    let turnstileReady = false;
+    let turnstileWidgetId = null;
+    window.onRentalTurnstileLoaded = () => { turnstileReady = true; };
     fetch("/api/crm/status").then(r => r.json()).then(status => {
       if (status.publicIntakeEnabled && status.stagingTestMode) {
         contactIntake.hidden = false;
@@ -226,7 +230,26 @@
       } else if (status.publicIntakeEnabled && status.realIntakeEnabled &&
                  status.stagingTestMode === false &&
                  status.privacyUrl === "https://altruisticdevelopment.com/privacy/") {
+        if (typeof status.turnstileSiteKey !== "string" || !/^[A-Za-z0-9_-]{10,200}$/.test(status.turnstileSiteKey)) return;
         isLiveIntake = true;
+        const challenge = document.getElementById("humanVerification");
+        challenge.hidden = false;
+        const script = document.createElement("script");
+        script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onRentalTurnstileLoaded";
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          const display = () => {
+            if (window.turnstile && turnstileWidgetId === null) {
+              turnstileWidgetId = window.turnstile.render(challenge, {
+                sitekey: status.turnstileSiteKey,
+                action: "rental_inquiry"
+              });
+            }
+          };
+          display();
+        };
+        document.head.appendChild(script);
         contactIntake.hidden = false;
         followUpJump.hidden = false;
         document.getElementById("leadDescription").textContent =
@@ -265,11 +288,18 @@
       const status = document.getElementById("leadStatus");
       const values = new FormData(leadForm);
       status.textContent = "Submitting...";
+      const turnstileToken = isLiveIntake && window.turnstile && turnstileWidgetId !== null
+        ? window.turnstile.getResponse(turnstileWidgetId) : "";
+      if (isLiveIntake && !turnstileToken) {
+        status.textContent = "Complete human verification before submitting.";
+        return;
+      }
       try {
         const response = await fetch("/api/crm/intake", {
           method:"POST",
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({
+            turnstileToken,
             name: values.get("name"), email: values.get("email")||"",
             phone: values.get("phone")||"",
             targetId:values.get("targetId"), domain:"rental",
@@ -306,7 +336,9 @@
           // An unavailable showing link must never be replaced with an invented booking.
         }
         leadForm.reset();
+        if (isLiveIntake && window.turnstile && turnstileWidgetId !== null) window.turnstile.reset(turnstileWidgetId);
       } catch(error) {
+        if (isLiveIntake && window.turnstile && turnstileWidgetId !== null) window.turnstile.reset(turnstileWidgetId);
         status.textContent = "We could not save your inquiry. Please try again or use the property contact link.";
       }
     });
