@@ -15,7 +15,8 @@ button{background:#245bd5;color:white;border:0;cursor:pointer}button:disabled{op
 </style></head>
 <body><main>
 <header><h1>Rental Assistant | Staff CRM</h1>
-<p class="muted">Private staging workspace. Fictional data only. AI-assisted drafts require staff review. Staging sends are simulations only; no emails or texts are sent.</p>
+<p class="muted" id="workspaceDescription">Private staff workspace. Loading environment status...</p>
+<p id="newInquiryCount" role="status" aria-live="polite"></p>
 <div class="toolbar"><button id="refresh" type="button">Refresh records</button>
 <button id="generate" type="button">Check due follow-ups</button>
 <span id="message" class="status" role="status" aria-live="polite"></span></div></header>
@@ -33,13 +34,19 @@ async function reload(){
  try{
   const data=await json("/api/staff/dashboard");
   const pipeline=q("pipeline"),tasks=q("tasks");pipeline.replaceChildren();tasks.replaceChildren();
+  const live=data.workspace==="live";
+  q("workspaceDescription").textContent=live?
+    "Private live CRM: real inquiries. Read-only review; email, follow-up generation, and stage changes are disabled until approved.":
+    "Private staging workspace. Fictional data only; messaging is simulated.";
+  q("newInquiryCount").textContent="New inquiries awaiting staff review: "+(data.attention?.newInquiryCount ?? 0);
+  q("generate").hidden=live;
   for(const e of data.pipeline){
    const tr=document.createElement("tr");
    cell(tr,e.contact?e.contact.name+" ("+(e.contact.email||e.contact.phone)+")":"Unknown contact");
    cell(tr,e.property);cell(tr,e.stage);cell(tr,e.nextAction);
    const controls=document.createElement("td");
    const next=e.stage==="CONTACT_CAPTURED"?"TOUR_OFFERED":e.stage==="TOUR_OFFERED"?"TOUR_SCHEDULED":"";
-   if(next){
+   if(next && !live){
     const action=document.createElement("button");
     action.textContent=next==="TOUR_OFFERED"?"Mark tour offered":"Confirm tour scheduled";
     action.addEventListener("click",async()=>{
@@ -90,7 +97,10 @@ async function reload(){
      });
      controls.appendChild(b);
    };
-   if(t.status==="pending-approval"){
+   if(live){
+     const info=document.createElement("span");info.className="muted";
+     info.textContent="Live actions disabled. Review manually."; controls.appendChild(info);
+   }else if(t.status==="pending-approval"){
      actionButton("Generate AI draft","generate-draft");
      actionButton("Save edited draft","edit-draft",()=>({draft:editor.value}));
      actionButton("Approve reviewed draft","approve");
