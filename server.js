@@ -15,6 +15,7 @@ const { stagingNextSteps } = require("./src/crm/prospectJourney");
 const { getPropertyInformation } = require("./dist/agent/tools");
 const { intakeStatus, acceptPublicInquiry } = require("./src/crm/publicIntake");
 const crypto = require("crypto");
+const {LocalAbuseGuard,peerIdentity} = require("./src/http/localAbuseGuard");
 const crmStore = makeStore();
 const crm = crmStore ? new CRM(crmStore, process.env.CRM_SCOPE || "rental-mvp") : null;
 const crmPublicIntakeEnabled = stagingIntakeEnabled(process.env, Boolean(crm));
@@ -52,10 +53,8 @@ function checkSameOrigin(req) {
 
 const PORT = process.env.PORT || 3000;
 
-const MAX_REQUESTS_PER_IP = 30;
-const WINDOW_MS = 15 * 60 * 1000;
-
-const rateLimits = new Map();
+const intakeGuard = new LocalAbuseGuard({maxRequests:12,maxInFlight:4,maxTotal:200});
+const chatGuard = new LocalAbuseGuard({maxRequests:30,maxInFlight:4,maxTotal:450});
 
 function sendJson(res, status, data) {
   res.writeHead(status, {
@@ -63,44 +62,7 @@ function sendJson(res, status, data) {
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff"
   });
-
   res.end(JSON.stringify(data));
-}
-
-function getClientIp(req) {
-  const forwardedFor = req.headers["x-forwarded-for"];
-
-  if (typeof forwardedFor === "string") {
-    return forwardedFor.split(",")[0].trim();
-  }
-
-  return req.socket.remoteAddress || "unknown";
-}
-
-function isRateLimited(ip) {
-  const now = Date.now();
-
-  const current = rateLimits.get(ip);
-
-  if (
-    !current ||
-    now - current.windowStart >= WINDOW_MS
-  ) {
-    rateLimits.set(ip, {
-      count: 1,
-      windowStart: now
-    });
-
-    return false;
-  }
-
-  if (current.count >= MAX_REQUESTS_PER_IP) {
-    return true;
-  }
-
-  current.count++;
-
-  return false;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -252,15 +214,16 @@ const server = http.createServer(async (req, res) => {
   // The CRM is disabled unless explicitly configured. This preserves existing chat behavior.
   if (pathname === "/api/crm/intake" && req.method === "POST") {
     if(!publicIntakeStatus.publicIntakeEnabled) {sendJson(res,503,{error:"Public intake not enabled"});return;}
-    if(isRateLimited(getClientIp(req))) {sendJson(res,429,{error:"Rate limited"});return;}
-    const data=await readJsonBody(req,res,4096); if(!data) return;
+    if(!intakeGuard.allow(peerIdentity(req))) {sendJson(res,429,{error:"Rate limited"});return;}
+    if(!intakeGuard.enter()) {sendJson(res,429,{error:"Service busy"});return;}
     try {
+      const data=await readJsonBody(req,res,4096); if(!data) return;
       sendJson(res,202,await acceptPublicInquiry({
         env:process.env,crm,headers:req.headers,body:data,lookupProperty:getPropertyInformation
       }));
     } catch(error) {
       sendJson(res,error.status || 500,{error:error.status?error.message:"CRM unavailable"});
-    }
+    } finally {intakeGuard.leave();}
     return;
   }
   if(pathname.startsWith("/api/crm/admin/")) {
@@ -303,9 +266,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && pathname === "/api/chat") {
-    const clientIp = getClientIp(req);
-
-    if (isRateLimited(clientIp)) {
+    if (!chatGuard.allow(peerIdentity(req))) {
       sendJson(res, 429, {
         error:
           "Too many messages. Please wait a few minutes and try again."
@@ -314,6 +275,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (!chatGuard.enter()) {sendJson(res,429,{error:"Service busy"});return;}
     let body = "";
 
     try {
@@ -363,7 +325,7 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 500, {
         error: "Unable to process your message."
       });
-    }
+    } finally {chatGuard.leave();}
 
     return;
   }
