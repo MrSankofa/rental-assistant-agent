@@ -22,3 +22,18 @@ test("real inquiries keep explicit consent, verification and privacy controls",(
  expect(html).toContain('name="preferredChannel" type="hidden" value="email"');
  expect(html).toMatch(/\[hidden\] \{ display: none !important; \}/);
 });
+
+test("assistant and visitor display distinct branded/decorative avatars",()=>{
+ expect(html).toContain('class="chat-avatar assistant"');
+ expect(html).toContain('logo.src = "/assets/brand/logo-mark-64.png"');
+ expect(html).toContain('createTurn(role, div)');
+ expect(html).toContain('document.createElementNS("http://www.w3.org/2000/svg", "svg")');
+ expect(html).toContain('turn.className = "chat-turn " + role');
+});
+test("thinking dots appear during request and are removed on success or failure",()=>{
+ expect(html).toContain("const typingTurn = addTypingIndicator()");
+ expect(html).toMatch(/finally\s*\{\s*typingTurn\.remove\(\)/);
+ expect(html).toContain('bubble.setAttribute("role", "status")');
+ expect(html).toContain("prefers-reduced-motion: reduce");
+ expect(html).toContain("animation: typing-pulse");
+});
