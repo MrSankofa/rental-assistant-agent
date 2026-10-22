@@ -9,7 +9,7 @@ const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
 const { generateFollowupTasks } = require("./src/crm/followups");
 const { prepareDraft, editDraft, approveAndSend, deliveryMode } = require("./src/crm/messaging");
-const { staffEnabled, liveStaffEnabled, summarizeDashboard } = require("./src/crm/staff");
+const { staffEnabled, liveStaffEnabled, legacyAdminEnabled, summarizeDashboard } = require("./src/crm/staff");
 const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
 const { stagingNextSteps } = require("./src/crm/prospectJourney");
 const { getPropertyInformation } = require("./dist/agent/tools");
@@ -264,7 +264,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if(pathname.startsWith("/api/crm/admin/")) {
-    if(liveStaffMode || publicIntakeStatus.realIntakeEnabled) {sendJson(res,404,{error:"Not found"});return;}
+    if(!legacyAdminEnabled(process.env)) {sendJson(res,404,{error:"Not found"});return;}
     if(!crm) {sendJson(res,503,{error:"CRM not configured"});return;}
     if(!staffAuthorized(req)) {sendJson(res,401,{error:"Unauthorized"});return;}
     if(!checkSameOrigin(req)) {sendJson(res,403,{error:"Origin not allowed"});return;}
