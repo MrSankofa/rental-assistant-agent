@@ -2,17 +2,19 @@
 
 const {stagingIntakeEnabled, validateFictionalIntake} = require("./stagingIntake");
 const {realIntakeEnabled, validateRealRentalIntake} = require("./realIntake");
+const {turnstileConfigured,verifyRealInquiry} = require("../http/turnstile");
 
 const httpError=(status,message)=>Object.assign(new Error(message),{status});
 
 function intakeStatus(env, crmConfigured) {
   const staging = stagingIntakeEnabled(env, crmConfigured);
-  const real = !staging && realIntakeEnabled(env, crmConfigured);
+  const real = !staging && realIntakeEnabled(env, crmConfigured) && turnstileConfigured(env);
   return {
     publicIntakeEnabled: staging || real,
     stagingTestMode: staging,
     realIntakeEnabled: real,
-    privacyUrl: real ? env.CRM_PRIVACY_URL : null
+    privacyUrl: real ? env.CRM_PRIVACY_URL : null,
+    turnstileSiteKey: real ? env.CRM_TURNSTILE_SITE_KEY : null
   };
 }
 
@@ -28,13 +30,14 @@ function requireIntakeRequest(headers, origin) {
       )) throw httpError(403,"Inquiry submission not permitted");
 }
 
-async function acceptPublicInquiry({env, crm, headers, body, lookupProperty}) {
+async function acceptPublicInquiry({env, crm, headers, body, lookupProperty, verify=verifyRealInquiry}) {
   const status=intakeStatus(env,Boolean(crm));
   if (!status.publicIntakeEnabled) throw httpError(503,"Public intake not enabled");
   requireIntakeRequest(headers,env.PUBLIC_ORIGIN);
   const validated=status.stagingTestMode
     ? validateFictionalIntake(body)
     : validateRealRentalIntake(body,lookupProperty);
+  if (status.realIntakeEnabled) await verify({env,token:body.turnstileToken});
   return crm.intake(validated,{origin:"public",actor:"prospect"});
 }
 
