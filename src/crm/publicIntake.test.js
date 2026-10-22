@@ -8,7 +8,8 @@ const live={
  CRM_BACKEND:"firestore",CRM_DATABASE:"rental-leads-prod",CRM_SCOPE:"rental-live",
  CRM_PUBLIC_INTAKE_ENABLED:"true",CRM_REAL_INTAKE_ENABLED:"true",
  PUBLIC_ORIGIN:"https://altruisticdevelopment.com",
- CRM_PRIVACY_URL:"https://altruisticdevelopment.com/privacy/"
+ CRM_PRIVACY_URL:"https://altruisticdevelopment.com/privacy/",
+ CRM_TURNSTILE_SITE_KEY:"0x4AAAAAexampleSiteKey",CRM_TURNSTILE_SECRET:"exampleSecret0123456789"
 };
 const staging={
  K_SERVICE:"rental-assistant-staging",CRM_STAGING_TEST_MODE:"true",
@@ -30,6 +31,7 @@ describe("public intake route orchestration without external I/O",()=>{
   expect(intakeStatus(live,true)).toMatchObject({publicIntakeEnabled:true,stagingTestMode:false,realIntakeEnabled:true});
   expect(intakeStatus({...live,CRM_REAL_INTAKE_ENABLED:"false"},true).publicIntakeEnabled).toBe(false);
   expect(intakeStatus({...live,CRM_DATABASE:"rental-email-staging"},true).publicIntakeEnabled).toBe(false);
+  expect(intakeStatus({...live,CRM_TURNSTILE_SECRET:""},true).publicIntakeEnabled).toBe(false);
  });
  test("requires exact origin and JSON MIME type before any database write",()=>{
   expect(()=>requireIntakeRequest(headers(live.PUBLIC_ORIGIN),live.PUBLIC_ORIGIN)).not.toThrow();
@@ -47,7 +49,8 @@ describe("public intake route orchestration without external I/O",()=>{
  });
  test("real inquiry persists once with private public acknowledgement",async()=>{
   const crm=new CRM(new MemoryStore(),"rental-live");
-  const request={env:live,crm,headers:headers(live.PUBLIC_ORIGIN),body:lead,lookupProperty:lookup};
+  const verify=jest.fn(async()=>true);
+  const request={env:live,crm,headers:headers(live.PUBLIC_ORIGIN),body:lead,lookupProperty:lookup,verify};
   const first=await acceptPublicInquiry(request);
   const second=await acceptPublicInquiry(request);
   expect(first).toEqual({received:true,message:expect.any(String)});
@@ -55,6 +58,7 @@ describe("public intake route orchestration without external I/O",()=>{
   expect(await crm.listContacts()).toHaveLength(1);
   expect(await crm.listEngagements()).toHaveLength(1);
   expect((await crm.listEngagements())[0].stage).toBe("CONTACT_CAPTURED");
+  expect(verify).toHaveBeenCalledTimes(2);
  });
  test("does not persist invalid fields or accept real people in staging",async()=>{
   const realCrm=new CRM(new MemoryStore(),"rental-live");
@@ -78,4 +82,12 @@ describe("public intake route orchestration without external I/O",()=>{
   })).rejects.toHaveProperty("status",503);
   expect(await crm.listContacts()).toHaveLength(0);
  });
+});
+
+test("real intake fails closed when human verification fails",async()=>{
+ const crm=new CRM(new MemoryStore(),"rental-live");
+ await expect(acceptPublicInquiry({env:live,crm,headers:headers(live.PUBLIC_ORIGIN),body:lead,
+ lookupProperty:lookup,verify:async()=>{throw Object.assign(new Error("Human verification required"),{status:403})}
+ })).rejects.toHaveProperty("status",403);
+ expect(await crm.listContacts()).toHaveLength(0);
 });
