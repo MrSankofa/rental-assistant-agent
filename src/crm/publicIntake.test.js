@@ -38,7 +38,12 @@ describe("public intake route orchestration without external I/O",()=>{
    {origin:live.PUBLIC_ORIGIN,"content-type":"text/plain"},
    {"content-type":"application/json"},
    {...headers(live.PUBLIC_ORIGIN),"sec-fetch-site":"cross-site"}
-  ])expect(()=>requireIntakeRequest(bad,live.PUBLIC_ORIGIN)).toHaveProperty("status",403);
+  ]) {
+    let thrown;
+    try { requireIntakeRequest(bad, live.PUBLIC_ORIGIN); }
+    catch (error) { thrown = error; }
+    expect(thrown).toHaveProperty("status", 403);
+  }
  });
  test("real inquiry persists once with private public acknowledgement",async()=>{
   const crm=new CRM(new MemoryStore(),"rental-live");
