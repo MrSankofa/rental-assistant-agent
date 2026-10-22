@@ -9,7 +9,7 @@ const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
 const { generateFollowupTasks } = require("./src/crm/followups");
 const { prepareDraft, editDraft, approveAndSend, deliveryMode } = require("./src/crm/messaging");
-const { staffEnabled, summarizeDashboard } = require("./src/crm/staff");
+const { staffEnabled, liveStaffEnabled, summarizeDashboard } = require("./src/crm/staff");
 const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
 const { stagingNextSteps } = require("./src/crm/prospectJourney");
 const { getPropertyInformation } = require("./dist/agent/tools");
@@ -19,6 +19,7 @@ const crmStore = makeStore();
 const crm = crmStore ? new CRM(crmStore, process.env.CRM_SCOPE || "rental-mvp") : null;
 const crmPublicIntakeEnabled = stagingIntakeEnabled(process.env, Boolean(crm));
 const privateStaffMode = Boolean(crm && staffEnabled(process.env));
+const liveStaffMode = Boolean(crm && liveStaffEnabled(process.env));
 const publicIntakeStatus = intakeStatus(process.env, Boolean(crm));
 const allowedOrigin = process.env.PUBLIC_ORIGIN || "";
 function staffAuthorized(req) {
@@ -185,10 +186,12 @@ const server = http.createServer(async (req, res) => {
       try {
         sendJson(res,200,summarizeDashboard(
           await crm.listContacts(), await crm.listEngagements(), await crm.listTasks(),
-          {deliveryMode:deliveryMode(process.env)}));
+          {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging"}));
       } catch(e) { sendJson(res,500,{error:"Unable to load staff dashboard"}); }
       return;
     }
+    // Live records are read-only until a separate authenticated staff workflow is approved.
+    if (liveStaffMode) { sendJson(res,403,{error:"Live staff actions not yet enabled"}); return; }
     // Mutating actions require an explicit same-origin request and no proxy-based bearer bypass.
     // Cloud Run IAM is the authentication perimeter of this private staff service.
     if (req.method === "POST" && !requireStagingOrigin(req.headers.origin,allowedOrigin)) {
@@ -261,6 +264,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if(pathname.startsWith("/api/crm/admin/")) {
+    if(liveStaffMode || publicIntakeStatus.realIntakeEnabled) {sendJson(res,404,{error:"Not found"});return;}
     if(!crm) {sendJson(res,503,{error:"CRM not configured"});return;}
     if(!staffAuthorized(req)) {sendJson(res,401,{error:"Unauthorized"});return;}
     if(!checkSameOrigin(req)) {sendJson(res,403,{error:"Origin not allowed"});return;}
