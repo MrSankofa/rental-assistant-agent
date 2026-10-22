@@ -13,11 +13,13 @@ const { staffEnabled, summarizeDashboard } = require("./src/crm/staff");
 const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
 const { stagingNextSteps } = require("./src/crm/prospectJourney");
 const { getPropertyInformation } = require("./dist/agent/tools");
+const { intakeStatus, acceptPublicInquiry } = require("./src/crm/publicIntake");
 const crypto = require("crypto");
 const crmStore = makeStore();
 const crm = crmStore ? new CRM(crmStore, process.env.CRM_SCOPE || "rental-mvp") : null;
 const crmPublicIntakeEnabled = stagingIntakeEnabled(process.env, Boolean(crm));
 const privateStaffMode = Boolean(crm && staffEnabled(process.env));
+const publicIntakeStatus = intakeStatus(process.env, Boolean(crm));
 const allowedOrigin = process.env.PUBLIC_ORIGIN || "";
 function staffAuthorized(req) {
   const secret = process.env.CRM_ADMIN_TOKEN;
@@ -240,18 +242,22 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && pathname === "/api/crm/status") {
-    sendJson(res, 200, { publicIntakeEnabled: crmPublicIntakeEnabled, stagingTestMode: crmPublicIntakeEnabled });
+    sendJson(res, 200, publicIntakeStatus);
     return;
   }
 
   // The CRM is disabled unless explicitly configured. This preserves existing chat behavior.
   if (pathname === "/api/crm/intake" && req.method === "POST") {
-    if(!crmPublicIntakeEnabled) {sendJson(res,503,{error:"Public intake not enabled"});return;}
-    if(!requireStagingOrigin(req.headers.origin, allowedOrigin)) {sendJson(res,403,{error:"Origin not allowed"});return;}
+    if(!publicIntakeStatus.publicIntakeEnabled) {sendJson(res,503,{error:"Public intake not enabled"});return;}
     if(isRateLimited(getClientIp(req))) {sendJson(res,429,{error:"Rate limited"});return;}
     const data=await readJsonBody(req,res,4096); if(!data) return;
-    try { sendJson(res,202,await crm.intake(validateFictionalIntake(data))); }
-    catch(error) {sendJson(res,error.status || 500,{error:error.status?error.message:"CRM unavailable"});}
+    try {
+      sendJson(res,202,await acceptPublicInquiry({
+        env:process.env,crm,headers:req.headers,body:data,lookupProperty:getPropertyInformation
+      }));
+    } catch(error) {
+      sendJson(res,error.status || 500,{error:error.status?error.message:"CRM unavailable"});
+    }
     return;
   }
   if(pathname.startsWith("/api/crm/admin/")) {
@@ -342,7 +348,7 @@ const server = http.createServer(async (req, res) => {
       const result = await askAI(
         data.message.trim(),
         previousResponseId,
-        { followUpFormAvailable: crmPublicIntakeEnabled }
+        { followUpFormAvailable: publicIntakeStatus.publicIntakeEnabled }
       );
 
       sendJson(res, 200, result);
