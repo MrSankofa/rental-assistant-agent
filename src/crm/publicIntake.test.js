@@ -92,3 +92,26 @@ test("real intake fails closed when human verification fails",async()=>{
  })).rejects.toHaveProperty("status",403);
  expect(await crm.listContacts()).toHaveLength(0);
 });
+
+test("replay is blocked before calling Cloudflare or writing CRM data",async()=>{
+ const crm=new CRM(new MemoryStore(),"rental-live");
+ const verify=jest.fn(async()=>true);
+ const request={env:live,crm,headers:headers(live.PUBLIC_ORIGIN),
+   body:{...lead,turnstileToken:"replayed-token"},lookupProperty:lookup,verify};
+ await acceptPublicInquiry(request);
+ await expect(acceptPublicInquiry(request)).rejects.toHaveProperty("status",403);
+ expect(verify).toHaveBeenCalledTimes(1);
+ expect(await crm.listContacts()).toHaveLength(1);
+ expect(await crm.listEngagements()).toHaveLength(1);
+});
+
+test("failed upstream verification cannot be retried using the same token",async()=>{
+ const crm=new CRM(new MemoryStore(),"rental-live");
+ const verify=jest.fn(async()=>{throw Object.assign(new Error("Rejected"),{status:403});});
+ const request={env:live,crm,headers:headers(live.PUBLIC_ORIGIN),
+   body:{...lead,turnstileToken:"failed-token"},lookupProperty:lookup,verify};
+ await expect(acceptPublicInquiry(request)).rejects.toHaveProperty("status",403);
+ await expect(acceptPublicInquiry(request)).rejects.toHaveProperty("status",403);
+ expect(verify).toHaveBeenCalledTimes(1);
+ expect(await crm.listContacts()).toHaveLength(0);
+});
