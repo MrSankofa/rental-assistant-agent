@@ -100,6 +100,9 @@ async function fixture() {
       fetchProviderResources,
       loadCrmCandidates,
       writesEnabled,
+      allowedEmailHash: crypto.createHash("sha256")
+        .update("dispatcher@example.test")
+        .digest("hex"),
       now,
       ...overrides
     });

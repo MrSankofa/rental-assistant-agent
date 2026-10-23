@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("crypto");
 const { authenticateCalendlyWebhook } =
   require("../http/calendlyAdapter");
 const { verifyCalendlyOwnership } =
@@ -20,6 +21,23 @@ function review(reason) {
   };
 }
 
+// The public receiver can write only for an explicitly allowed test email.
+// Compare a trusted Calendly email, never an unverified request field.
+function allowedTestEmail(email, allowedEmailHash) {
+  if (typeof email !== "string" ||
+      !/^[a-f0-9]{64}$/.test(allowedEmailHash || "")) {
+    return false;
+  }
+
+  const actual = crypto.createHash("sha256")
+    .update(email.trim().toLowerCase())
+    .digest();
+
+  return crypto.timingSafeEqual(
+    actual, Buffer.from(allowedEmailHash, "hex")
+  );
+}
+
 // Trusted application boundary. All dependencies are server-controlled.
 // Never expose this function directly to untrusted request parameters.
 async function dispatchCalendlyWebhook({
@@ -32,6 +50,7 @@ async function dispatchCalendlyWebhook({
   fetchProviderResources,
   loadCrmCandidates,
   writesEnabled = false,
+  allowedEmailHash = "",
   now = Date.now()
 }) {
   if (!crm?.store ||
@@ -140,6 +159,11 @@ async function dispatchCalendlyWebhook({
       return review(inspected.reason);
     }
 
+    if (writesEnabled &&
+        !allowedTestEmail(inspected.booking.email, allowedEmailHash)) {
+      return review("prospect-not-allowlisted");
+    }
+
     if (!writesEnabled) {
       return {
         status: "verified-dry-run",
@@ -227,6 +251,11 @@ async function dispatchCalendlyWebhook({
       !email ||
       contact.value.email?.trim().toLowerCase() !== email) {
     return review("crm-ownership-mismatch");
+  }
+
+  if (writesEnabled &&
+      !allowedTestEmail(email, allowedEmailHash)) {
+    return review("prospect-not-allowlisted");
   }
 
   if (!writesEnabled) {

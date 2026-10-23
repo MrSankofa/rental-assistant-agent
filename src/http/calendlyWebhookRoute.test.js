@@ -167,3 +167,49 @@ test("valid webhook verifies provider but never writes CRM", async () => {
   expect((await crm.history(lead.engagementId)).stage)
     .toBe("TOUR_OFFERED");
 });
+
+test("write switch fails closed without an allowlisted email", async () => {
+  const { crm, lead, body } = await fixture();
+
+  const result = await handleCalendlyWebhook({
+    req: request(body),
+    crm,
+    env: {
+      ...env,
+      CALENDLY_CRM_WRITES_ENABLED: "true",
+      CALENDLY_CRM_WRITE_EMAIL_SHA256: "0".repeat(64)
+    }
+  });
+
+  expect(result.statusCode).toBe(202);
+  expect(result.body.status).toBe("requires-review");
+  expect(result.body.crmUpdated).toBe(false);
+  expect(await crm.store.list("bookings")).toHaveLength(0);
+  expect((await crm.history(lead.engagementId)).stage)
+    .toBe("TOUR_OFFERED");
+});
+
+test("write switch schedules only the allowlisted staging prospect", async () => {
+  const { crm, lead, body } = await fixture();
+
+  const allowed = crypto.createHash("sha256")
+    .update("http-fixture@example.test")
+    .digest("hex");
+
+  const result = await handleCalendlyWebhook({
+    req: request(body),
+    crm,
+    env: {
+      ...env,
+      CALENDLY_CRM_WRITES_ENABLED: "true",
+      CALENDLY_CRM_WRITE_EMAIL_SHA256: allowed
+    }
+  });
+
+  expect(result.statusCode).toBe(202);
+  expect(result.body.status).toBe("scheduled");
+  expect(result.body.crmUpdated).toBe(true);
+  expect(await crm.store.list("bookings")).toHaveLength(1);
+  expect((await crm.history(lead.engagementId)).stage)
+    .toBe("TOUR_SCHEDULED");
+});

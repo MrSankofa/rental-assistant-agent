@@ -66,6 +66,16 @@ async function handleCalendlyWebhook({ req, crm, env = process.env }) {
       token: env.CALENDLY_API_TOKEN
     });
 
+    const writeSwitchEnabled =
+      env.CALENDLY_CRM_WRITES_ENABLED === "true";
+
+    const allowedEmailHash =
+      env.CALENDLY_CRM_WRITE_EMAIL_SHA256 || "";
+
+    // Fail closed: no writes without a valid test-email allowlist.
+    const writesEnabled = writeSwitchEnabled &&
+      /^[a-f0-9]{64}$/.test(allowedEmailHash);
+
     const result = await dispatchCalendlyWebhook({
       crm,
       rawBody,
@@ -76,9 +86,9 @@ async function handleCalendlyWebhook({ req, crm, env = process.env }) {
       fetchProviderResources: api.fetchProviderResources,
       loadCrmCandidates: makeCalendlyCandidateLookup(crm),
 
-      // This initial HTTP integration is intentionally read-only.
-      // Do not enable writes merely by changing an environment variable.
-      writesEnabled: false
+      // Only the explicitly allowlisted staging prospect can be changed.
+      writesEnabled,
+      allowedEmailHash
     });
 
     return {
@@ -86,7 +96,7 @@ async function handleCalendlyWebhook({ req, crm, env = process.env }) {
       body: {
         received: true,
         status: result.status,
-        crmUpdated: false
+        crmUpdated: result.crmUpdated === true
       }
     };
   } catch (error) {
