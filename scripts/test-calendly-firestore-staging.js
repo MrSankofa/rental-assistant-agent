@@ -8,6 +8,8 @@ const {
   bookingId
 } = require("../src/crm/calendlyBookings");
 
+const { recoverBookings } = require("../src/crm/calendlyRecovery");
+
 const PROJECT = "altruistic-platform";
 const DATABASE = "rental-email-staging";
 const EXPECTED_SA =
@@ -136,6 +138,55 @@ async function main() {
   }
 
   console.log("FIRESTORE_CANCELLATION_IDEMPOTENCY_PASS");
+
+  // Simulate termination after persisting cancellation but before CRM sync.
+  const engagementRow = await store.get(
+    "engagements", lead.engagementId
+  );
+  await store.replace("engagements", lead.engagementId, {
+    ...engagementRow.value,
+    stage: "TOUR_SCHEDULED"
+  }, engagementRow.version);
+
+  const pendingBooking = await store.get(
+    "bookings", bookingId(inviteeId)
+  );
+  await store.replace("bookings", bookingId(inviteeId), {
+    ...pendingBooking.value,
+    crmSyncStatus: "pending"
+  }, pendingBooking.version);
+
+  const firstRecovery = await recoverBookings(crm);
+
+  if (firstRecovery.failures !== 0 ||
+      firstRecovery.repaired !== 1 ||
+      (await crm.history(lead.engagementId)).stage !== "TOUR_CANCELLED" ||
+      (await store.get("bookings", bookingId(inviteeId)))
+        .value.crmSyncStatus !== "completed") {
+    throw new Error("FIRESTORE_INTERRUPTED_CANCELLATION_RECOVERY_FAILED");
+  }
+
+  console.log("FIRESTORE_INTERRUPTED_RECOVERY_PASS");
+
+  // Simulate a late creation worker overwriting completed cancellation.
+  const lateEngagement = await store.get(
+    "engagements", lead.engagementId
+  );
+  await store.replace("engagements", lead.engagementId, {
+    ...lateEngagement.value,
+    stage: "TOUR_SCHEDULED"
+  }, lateEngagement.version);
+
+  const secondRecovery = await recoverBookings(crm);
+
+  if (secondRecovery.failures !== 0 ||
+      secondRecovery.repaired !== 1 ||
+      (await crm.history(lead.engagementId)).stage !== "TOUR_CANCELLED") {
+    throw new Error("FIRESTORE_LATE_WORKER_RECOVERY_FAILED");
+  }
+
+  console.log("FIRESTORE_LATE_WORKER_RECOVERY_PASS");
+
   console.log("CALENDLY_FIRESTORE_STAGING_TEST_PASS");
 }
 
