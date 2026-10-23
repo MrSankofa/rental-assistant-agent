@@ -13,6 +13,8 @@ const inviteeUri =
   scheduledEventUri + "/invitees/invitee-456";
 const expectedEventTypeUri =
   "https://api.calendly.com/event_types/ziegler-type-123";
+const expectedHostUri =
+  "https://api.calendly.com/users/our-host-123";
 
 function fixture() {
   const message = {
@@ -36,11 +38,15 @@ function fixture() {
     signatureHeader: `t=${timestamp},v1=${signature}`,
     signingKey,
     now,
-    expectedEventTypeUri,
+    expectedEventTypeUri,    expectedHostUri,
+
     fetchProviderResources: jest.fn(async () => ({
       scheduledEvent: {
         uri: scheduledEventUri,
-        event_type: expectedEventTypeUri,
+        event_type: expectedEventTypeUri,        event_memberships: [
+          { user: expectedHostUri }
+        ],
+
         status: "active",
         start_time: "2026-11-02T18:00:00Z",
         end_time: "2026-11-02T18:30:00Z"

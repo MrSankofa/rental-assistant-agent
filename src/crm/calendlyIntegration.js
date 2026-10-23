@@ -4,6 +4,8 @@ const { authenticateCalendlyWebhook } =
   require("../http/calendlyAdapter");
 const { resolveCalendlyBooking } =
   require("./calendlyResolver");
+const { verifyCalendlyOwnership } =
+  require("./calendlyOwnership");
 
 const fail = (message) =>
   Object.assign(new Error(message), { status: 503 });
@@ -17,6 +19,7 @@ async function inspectCalendlyWebhook({
   signatureHeader,
   signingKey,
   expectedEventTypeUri,
+  expectedHostUri,
   fetchProviderResources,
   loadCrmCandidates,
   now = Date.now()
@@ -41,6 +44,23 @@ async function inspectCalendlyWebhook({
   if (!provider || !provider.scheduledEvent ||
       !provider.invitee) {
     throw fail("Trusted Calendly records unavailable");
+  }
+
+  const ownership = verifyCalendlyOwnership({
+    scheduledEvent: provider.scheduledEvent,
+    expectedEventTypeUri,
+    expectedHostUri
+  });
+
+  if (!ownership.verified) {
+    return {
+      resolved: false,
+      reason: ownership.reason,
+      requiresStaffReview: true,
+      dryRun: true,
+      bookingPersisted: false,
+      crmUpdated: false
+    };
   }
 
   const candidates = await loadCrmCandidates({
