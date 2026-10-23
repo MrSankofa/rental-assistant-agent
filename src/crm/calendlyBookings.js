@@ -115,7 +115,23 @@ async function processBooking(crm, event) {
 
       const booking = row.value;
       if (booking.crmSyncStatus === "completed") {
-        return { status: "duplicate" };
+        const currentEngagement = booking.engagementId
+          ? await crm.store.get("engagements", booking.engagementId)
+          : null;
+
+        if (currentEngagement?.value.stage !== "TOUR_SCHEDULED") {
+          return { status: "duplicate" };
+        }
+
+        // A late creation worker may have rescheduled the CRM after
+        // cancellation was marked completed. Repair the stage.
+        await crm.transition(
+          booking.engagementId,
+          { stage: "TOUR_CANCELLED" },
+          "calendar-verified"
+        );
+
+        return { status: "cancelled" };
       }
       if (booking.crmSyncStatus === "requires-review" ||
           !booking.engagementId) {
@@ -182,6 +198,13 @@ async function processBooking(crm, event) {
       const current = await crm.store.get("bookings", id);
       if (!current) throw fail(503, "Booking disappeared");
       if (current.value.status !== "scheduled") {
+        if (current.value.status === "cancelled") {
+          // Reconcile after a creation/cancellation race.
+          await processBooking(crm, {
+            type: "canceled",
+            inviteeId: event.inviteeId
+          });
+        }
         return { status: "requires-review" };
       }
       if (current.value.crmSyncStatus === "completed") {
