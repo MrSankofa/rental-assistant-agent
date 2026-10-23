@@ -22,7 +22,7 @@ const headers=origin=>({origin,"content-type":"application/json","sec-fetch-site
 const lead={
  name:"Fictional Public",email:"fictional-public@example.test",phone:"",
  domain:"rental",targetId:"ziegler",interest:"Tour inquiry",
- preferredChannel:"email",consent:{recording:true,email:false,sms:false}
+ preferredChannel:"email",turnstileToken:"mock-first-token",consent:{recording:true,email:false,sms:false}
 };
 const lookup=()=>({found:true,property:{available:true}});
 describe("public intake route orchestration without external I/O",()=>{
@@ -52,7 +52,8 @@ describe("public intake route orchestration without external I/O",()=>{
   const verify=jest.fn(async()=>true);
   const request={env:live,crm,headers:headers(live.PUBLIC_ORIGIN),body:lead,lookupProperty:lookup,verify};
   const first=await acceptPublicInquiry(request);
-  const second=await acceptPublicInquiry(request);
+  await expect(acceptPublicInquiry(request)).rejects.toHaveProperty("status",403);
+  const second=await acceptPublicInquiry({...request,body:{...lead,turnstileToken:"mock-second-token"}});
   expect(first).toEqual({received:true,message:expect.any(String)});
   expect(second).toEqual(first);
   expect(await crm.listContacts()).toHaveLength(1);
