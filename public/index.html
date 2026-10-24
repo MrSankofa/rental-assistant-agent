@@ -199,7 +199,7 @@
           <h2 id="showingNextHeading">Next step: schedule your showing</h2>
           <p>Your inquiry is recorded for staff review. To request a showing time, complete the verified Calendly scheduling process. Opening the link alone does not book a showing.</p>
           <a id="showingNextLink" target="_blank" rel="noopener noreferrer">Continue to Calendly scheduling</a>
-          <p>The assistant does not automatically record or confirm Calendly reservations in the CRM.</p>
+          <p>A showing is confirmed only after Calendly verifies the booking and the CRM matches it. Until then, staff may need to review the reservation.</p>
           </section>
         </div>
       </div>
@@ -330,19 +330,22 @@
         nextSection.hidden = true;
         nextLink.removeAttribute("href");
         try {
-          const nextResponse = await fetch("/api/crm/staging-next-steps", {cache:"no-store"});
-          if (nextResponse.ok) {
-            const steps = await nextResponse.json();
-            if (steps.showingAvailable && steps.propertyId === "ziegler" &&
-                steps.bookingRecorded === false && typeof steps.showingUrl === "string") {
-              const verified = new URL(steps.showingUrl);
-              if (verified.protocol === "https:" && verified.hostname === "calendly.com") {
-                nextLink.href = verified.href;
-                nextSection.hidden = false;
-                showingNextTurn.hidden = false;
-                messages.appendChild(showingNextTurn);
-                messages.scrollTop = messages.scrollHeight;
-              }
+          // Staging: only show a link that was offered AND recorded by intake.
+          // Preserve the earlier read-only link path for separate live-intake work.
+          let steps = result.nextSteps || null;
+          if (!steps && isLiveIntake) {
+            const nextResponse = await fetch("/api/crm/staging-next-steps", {cache:"no-store"});
+            if (nextResponse.ok) steps = await nextResponse.json();
+          }
+          if (steps && steps.showingAvailable && steps.propertyId === "ziegler" &&
+              steps.bookingRecorded === false && typeof steps.showingUrl === "string") {
+            const verified = new URL(steps.showingUrl);
+            if (verified.protocol === "https:" && verified.hostname === "calendly.com") {
+              nextLink.href = verified.href;
+              nextSection.hidden = false;
+              showingNextTurn.hidden = false;
+              messages.appendChild(showingNextTurn);
+              messages.scrollTop = messages.scrollHeight;
             }
           }
         } catch (_) {
