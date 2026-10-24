@@ -101,6 +101,16 @@ describe("controlled CRM Resend integration",()=>{
     expect(fetchFn).toHaveBeenCalledTimes(1);
     expect(fetchFn.mock.calls[0][0]).toBe("https://api.resend.com/emails");
     expect(JSON.parse(fetchFn.mock.calls[0][1].body).to).toEqual([TEST_INBOX]);
+    const [url, request] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api.resend.com/emails");
+    expect(request.method).toBe("POST");
+    expect(request.headers["Idempotency-Key"]).toBe("rental-" + task.id);
+    expect(request.headers.Authorization).toBe("Bearer " + key);
+    expect(JSON.parse(request.body)).toMatchObject({
+      from:"Rental Assistant <rentals@altruisticdevelopment.com>",
+      to:[TEST_INBOX],
+      reply_to:"rentals@altruisticdevelopment.com"
+    });
     expect((await deliverControlledCrmTest(crm,task.id,{
       env:env(task.id),fetchFn,now
     })).outcome).toBe("skipped");
@@ -202,5 +212,84 @@ describe("controlled CRM Resend integration",()=>{
       env:env(task.id),fetchFn,now
     })).outcome).toBe("skipped");
     expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  test("two concurrent attempts authorize exactly one provider submission",async()=>{
+    const {crm,task,now}=await fixture(), fetchFn=accepted();
+    const outcomes=await Promise.all([
+      deliverControlledCrmTest(crm,task.id,{env:env(task.id),fetchFn,now}),
+      deliverControlledCrmTest(crm,task.id,{env:env(task.id),fetchFn,now})
+    ]);
+    expect(outcomes.map(r=>r.outcome).sort()).toEqual(["accepted","skipped"]);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect((await crm.store.get("tasks",task.id)).value.delivery.providerId)
+      .toBe("mock-receipt-id");
+  });
+  test("recipient changed after reservation is handed to staff without sending",async()=>{
+    const {crm,task,now,contactId}=await fixture(),fetchFn=jest.fn();
+    const replace=crm.store.replace.bind(crm.store);
+    crm.store.replace=async(collection,id,value,version)=>{
+      await replace(collection,id,value,version);
+      if(collection==="tasks"&&value.status==="delivery-reserved"){
+        const contact=await crm.store.get("contacts",contactId);
+        await replace("contacts",contactId,{
+          ...contact.value,email:"changed@example.test"
+        },contact.version);
+      }
+    };
+    const outcome=await deliverControlledCrmTest(crm,task.id,{
+      env:env(task.id),fetchFn,now
+    });
+    expect(outcome.outcome).toBe("staff-review");
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect((await crm.store.get("tasks",task.id)).value)
+      .toMatchObject({status:"pending-approval",delivery:{status:"not-sent"}});
+  });
+  test("stage timestamp changed after reservation invalidates the original task",async()=>{
+    const {crm,task,now,engagementId}=await fixture(),fetchFn=jest.fn();
+    const replace=crm.store.replace.bind(crm.store);
+    crm.store.replace=async(collection,id,value,version)=>{
+      await replace(collection,id,value,version);
+      if(collection==="tasks"&&value.status==="delivery-reserved"){
+        const engagement=await crm.store.get("engagements",engagementId);
+        await replace("engagements",engagementId,{
+          ...engagement.value,
+          updatedAt:new Date(Date.parse(engagement.value.updatedAt)+1000).toISOString()
+        },engagement.version);
+      }
+    };
+    expect((await deliverControlledCrmTest(crm,task.id,{
+      env:env(task.id),fetchFn,now
+    })).outcome).toBe("staff-review");
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+  test("missing contact and not-yet-due tasks never contact the provider",async()=>{
+    const first=await fixture(),fetchFn=jest.fn();
+    const premature=new Date(Date.parse(first.task.dueAt)-1000);
+    expect((await deliverControlledCrmTest(first.crm,first.task.id,{
+      env:env(first.task.id),fetchFn,now:premature
+    })).outcome).toBe("skipped");
+    const second=await fixture();
+    second.crm.store.rows.delete(second.crm.store.key("contacts",second.contactId));
+    expect((await deliverControlledCrmTest(second.crm,second.task.id,{
+      env:env(second.task.id),fetchFn,now:second.now
+    })).outcome).toBe("skipped");
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+  test("audit persistence failure after claim keeps the reservation locked",async()=>{
+    const {crm,task,now}=await fixture(),fetchFn=jest.fn();
+    const originalAudit=crm.audit.bind(crm);
+    crm.audit=async(actor,type,entityId,details)=>{
+      if(type==="automatic-email-reserved")throw Error("Audit persistence unavailable");
+      return originalAudit(actor,type,entityId,details);
+    };
+    await expect(deliverControlledCrmTest(crm,task.id,{
+      env:env(task.id),fetchFn,now
+    })).rejects.toThrow("Audit persistence unavailable");
+    expect((await crm.store.get("tasks",task.id)).value.status).toBe("delivery-reserved");
+    expect((await deliverControlledCrmTest(crm,task.id,{
+      env:env(task.id),fetchFn,now
+    })).outcome).toBe("skipped");
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 });
