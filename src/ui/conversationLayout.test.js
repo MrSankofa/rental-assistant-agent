@@ -41,3 +41,20 @@ test("thinking dots appear during request and are removed on success or failure"
  expect(html).toContain("prefers-reduced-motion: reduce");
  expect(html).toContain("animation: typing-pulse");
 });
+
+test("showing interest opens minimal first-and-last-name intake before link",()=>{
+  expect(html).toContain('name="firstName"');
+  expect(html).toContain('name="lastName"');
+  expect(html).toContain('name="email" type="email"');
+  expect(html).toContain('id="inquiryExtraFields"');
+  expect(html).toContain('function openLeadForm(mode)');
+  expect(html).toContain('openLeadForm("showing")');
+  expect(html).toContain('openLeadForm("staff")');
+  expect(html).toContain('propertySelect.value = "ziegler"');
+  expect(html).toContain('leadForm.elements.namedItem("interest").value = "Tour inquiry"');
+  expect(html).toContain('showing ? "Continue to showing times"');
+  expect(html).toContain('String(values.get("firstName") || "").trim()');
+  expect(html).toContain('String(values.get("lastName") || "").trim()');
+  expect(html).toContain('use the same email when choosing a showing time');
+  expect(html).toContain('bookingRecorded === false');
+});

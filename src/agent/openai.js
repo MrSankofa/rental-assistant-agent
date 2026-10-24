@@ -119,7 +119,7 @@ function extractAnswer(response) {
     .join("\n");
 }
 
-function buildInstructions({ followUpFormAvailable = false } = {}) {
+function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAvailable = false } = {}) {
   return `
     You are a professional rental property assistant.
     Today's date is ${new Date().toISOString().slice(0, 10)}.
@@ -154,8 +154,10 @@ function buildInstructions({ followUpFormAvailable = false } = {}) {
     - Never offer showing appointments for properties with available=false.
     - If property information contains a showingUrl and available=true, that link is the
       authoritative way to schedule a showing.
-    - When the user asks to schedule or see the property, provide
-      the showingUrl.
+    - When the user asks to schedule or see the property,
+      ${guidedShowingFormAvailable ?
+        "direct them to the Schedule a showing option and its short contact form before Calendly; do not output the showingUrl in the chat." :
+        "provide the showingUrl."}
     - Do not claim a showing has been booked unless the user completes
       scheduling through the provided link.
     - Do not use getShowingAvailability when a showingUrl is available.
@@ -181,6 +183,8 @@ function buildInstructions({ followUpFormAvailable = false } = {}) {
     - Output URLs as plain https:// URLs on their own line.
     - Avoid repeating facts the user did not ask about.
     - You may offer one brief next step when useful.
+    ${guidedShowingFormAvailable ?
+      '- If a visitor expresses interest in viewing Ziegler, suggest the "Schedule a showing" action, which collects only first name, last name, and email. Do not ask for contact details in free-text chat.' : '' }
 
     SAFETY:
     - Do not make tenant screening, qualification, approval, ranking,
@@ -198,8 +202,8 @@ function buildInstructions({ followUpFormAvailable = false } = {}) {
   `;
 }
 
-async function askAI(question, previousResponseId = null, { followUpFormAvailable = false } = {}) {
-  const instructions = buildInstructions({ followUpFormAvailable });
+async function askAI(question, previousResponseId = null, { followUpFormAvailable = false, guidedShowingFormAvailable = false } = {}) {
+  const instructions = buildInstructions({ followUpFormAvailable, guidedShowingFormAvailable });
 
   const initialPayload = {
     model: "gpt-4.1-mini",

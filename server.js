@@ -328,7 +328,8 @@ const server = http.createServer(async (req, res) => {
       const result = await askAI(
         data.message.trim(),
         previousResponseId,
-        { followUpFormAvailable: publicIntakeStatus.publicIntakeEnabled }
+        { followUpFormAvailable: publicIntakeStatus.publicIntakeEnabled,
+          guidedShowingFormAvailable: publicIntakeStatus.stagingTestMode }
       );
 
       sendJson(res, 200, result);
