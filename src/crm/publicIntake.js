@@ -3,6 +3,7 @@
 const {stagingIntakeEnabled, validateFictionalIntake} = require("./stagingIntake");
 const {realIntakeEnabled, validateRealRentalIntake} = require("./realIntake");
 const {turnstileConfigured,verifyRealInquiry} = require("../http/turnstile");
+const {offerStagingShowing}=require("./stagingShowingHandoff");
 
 const httpError=(status,message)=>Object.assign(new Error(message),{status});
 
@@ -38,7 +39,16 @@ async function acceptPublicInquiry({env, crm, headers, body, lookupProperty, ver
     ? validateFictionalIntake(body)
     : validateRealRentalIntake(body,lookupProperty);
   if (status.realIntakeEnabled) await verify({env,token:body.turnstileToken});
-  return crm.intake(validated,{origin:"public",actor:"prospect"});
+  const receipt=await crm.intake(validated,{origin:"public",actor:"prospect"});
+  if(!status.stagingTestMode) return receipt;
+  // Only fictional private staging offers a tour automatically. Never expose CRM IDs.
+  // Intake is already durable: a failed handoff must remain a staff-reviewed inquiry.
+  try {
+    const nextSteps=await offerStagingShowing(crm,validated,lookupProperty);
+    return nextSteps ? {...receipt,nextSteps} : receipt;
+  } catch (_) {
+    return receipt;
+  }
 }
 
 module.exports={intakeStatus,requireIntakeRequest,acceptPublicInquiry};

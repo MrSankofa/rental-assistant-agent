@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { requestPath } = require("./src/http/requestPath");
+const { handleCalendlyWebhook } = require("./src/http/calendlyWebhookRoute");
 const { askAI } = require("./src/agent/openai");
 
 
@@ -67,6 +68,19 @@ function sendJson(res, status, data) {
 
 const server = http.createServer(async (req, res) => {
   const pathname = requestPath(req.url);
+
+  // Calendly integration is staging-only and read-only at this phase.
+  if (req.method === "POST" &&
+      pathname === "/api/integrations/calendly/webhook") {
+    const outcome = await handleCalendlyWebhook({
+      req,
+      crm,
+      env: process.env
+    });
+
+    sendJson(res, outcome.statusCode, outcome.body);
+    return;
+  }
 
   // Health check for Cloud Run.
   if (req.method === "GET" && pathname === "/healthz") {
@@ -314,7 +328,8 @@ const server = http.createServer(async (req, res) => {
       const result = await askAI(
         data.message.trim(),
         previousResponseId,
-        { followUpFormAvailable: publicIntakeStatus.publicIntakeEnabled }
+        { followUpFormAvailable: publicIntakeStatus.publicIntakeEnabled,
+          guidedShowingFormAvailable: publicIntakeStatus.stagingTestMode }
       );
 
       sendJson(res, 200, result);
