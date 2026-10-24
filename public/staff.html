@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rental Assistant | Staff CRM</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f3f4f6;color:#172337;margin:0;padding:24px}
+main{max-width:1100px;margin:auto}h1{font-size:1.65rem}p{line-height:1.5}
+header{margin-bottom:24px}section{background:white;border:1px solid #d6dce4;border-radius:10px;padding:18px;margin:20px 0}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+th{font-size:.85rem;color:#536277}button,select,input{font:inherit;padding:9px;border-radius:6px}
+button{background:#245bd5;color:white;border:0;cursor:pointer}button:disabled{opacity:.5}
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.muted{color:#566579;font-size:.9rem}
+.status{min-height:1.5em}.badge{background:#eaf1ff;border-radius:6px;padding:4px}
+@media(max-width:700px){.scroll{overflow:auto}th,td{min-width:115px}}
+</style></head>
+<body><main>
+<header><h1>Rental Assistant | Staff CRM</h1>
+<p class="muted" id="workspaceDescription">Private staff workspace. Loading environment status...</p>
+<p id="newInquiryCount" role="status" aria-live="polite"></p>
+<div class="toolbar"><button id="refresh" type="button">Refresh records</button>
+<button id="generate" type="button">Check due follow-ups</button>
+<span id="message" class="status" role="status" aria-live="polite"></span></div></header>
+<section><h2>Prospect pipeline</h2><div class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
+<section><h2>Follow-up review queue</h2><p class="muted">Generate or edit a draft, approve it, then simulate delivery. No real email will be sent.</p>
+<div class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
+</main><script>
+const q=id=>document.getElementById(id);
+const stamp=x=>x?new Date(x).toLocaleString():"";
+function cell(row,text){const td=document.createElement("td");td.textContent=String(text??"");row.appendChild(td);return td;}
+async function json(url,options){const r=await fetch(url,{cache:"no-store",...options});const d=await r.json();if(!r.ok)throw Error(d.error||"Request failed");return d;}
+function message(text){q("message").textContent=text;}
+async function reload(){
+ message("Loading...");
+ try{
+  const data=await json("/api/staff/dashboard");
+  const pipeline=q("pipeline"),tasks=q("tasks");pipeline.replaceChildren();tasks.replaceChildren();
+  const live=data.workspace==="live";
+  q("workspaceDescription").textContent=live?
+    "Private live CRM: real inquiries. Read-only review; email, follow-up generation, and stage changes are disabled until approved.":
+    "Private staging workspace. Fictional data only; messaging is simulated.";
+  q("newInquiryCount").textContent="New inquiries awaiting staff review: "+(data.attention?.newInquiryCount ?? 0);
+  q("generate").hidden=live;
+  for(const e of data.pipeline){
+   const tr=document.createElement("tr");
+   cell(tr,e.contact?e.contact.name+" ("+(e.contact.email||e.contact.phone)+")":"Unknown contact");
+   cell(tr,e.property);cell(tr,e.stage);cell(tr,e.nextAction);
+   const controls=document.createElement("td");
+   const next=e.stage==="CONTACT_CAPTURED"?"TOUR_OFFERED":e.stage==="TOUR_OFFERED"?"TOUR_SCHEDULED":"";
+   if(next && !live){
+    const action=document.createElement("button");
+    action.textContent=next==="TOUR_OFFERED"?"Mark tour offered":"Confirm tour scheduled";
+    action.addEventListener("click",async()=>{
+     if(!confirm("Confirm this milestone based on an external staff-verified action?"))return;
+     action.disabled=true;
+     try{
+      await json("/api/staff/engagements/"+encodeURIComponent(e.id)+"/stage",{
+       method:"POST",headers:{"Content-Type":"application/json"},
+       body:JSON.stringify({stage:next,nextAction:"Staff review next leasing step"})
+      });
+      await reload();
+     }catch(err){message(err.message);action.disabled=false;}
+    });
+    controls.appendChild(action);
+   }
+   tr.appendChild(controls);pipeline.appendChild(tr);
+  }
+  for(const t of data.tasks){
+   const tr=document.createElement("tr");
+   cell(tr,t.summary);cell(tr,stamp(t.dueAt));cell(tr,t.status);
+   const draftCell=document.createElement("td");
+   const editor=document.createElement("textarea");
+   editor.value=t.draft||"";
+   editor.rows=4;editor.maxLength=1000;editor.style.width="100%";
+   editor.style.minWidth="240px";
+   editor.disabled=t.status!=="pending-approval";
+   editor.setAttribute("aria-label","Follow-up email draft");
+   draftCell.appendChild(editor);
+   const origin=document.createElement("div");
+   origin.className="muted";
+   origin.textContent="Draft: "+(t.draftOrigin||"template")+" | Delivery: "+(t.deliveryStatus||"not-sent");
+   draftCell.appendChild(origin);
+   tr.appendChild(draftCell);
+   const td=document.createElement("td");
+   const controls=document.createElement("div");
+   controls.style.display="grid";controls.style.gap="7px";
+   const actionButton=(label,endpoint,body)=>{
+     const b=document.createElement("button");
+     b.textContent=label;b.type="button";
+     b.addEventListener("click",async()=>{
+       b.disabled=true;
+       try{
+         await json("/api/staff/tasks/"+encodeURIComponent(t.id)+"/"+endpoint,{
+           method:"POST",...(body?{headers:{"Content-Type":"application/json"},body:JSON.stringify(body())}:{})
+         });
+         await reload();
+       }catch(e){message(e.message);b.disabled=false;}
+     });
+     controls.appendChild(b);
+   };
+   if(live){
+     const info=document.createElement("span");info.className="muted";
+     info.textContent="Live actions disabled. Review manually."; controls.appendChild(info);
+   }else if(t.status==="pending-approval"){
+     actionButton("Generate AI draft","generate-draft");
+     actionButton("Save edited draft","edit-draft",()=>({draft:editor.value}));
+     actionButton("Approve reviewed draft","approve");
+   }else if(t.status==="approved"){
+     if(data.deliveryMode==="simulation")
+       actionButton("Simulate approved send","send-approved");
+     else {
+       const info=document.createElement("span");
+       info.className="muted";info.textContent="Sending disabled in this environment.";
+       controls.appendChild(info);
+     }
+   }
+   td.appendChild(controls);
+   tr.appendChild(td);tasks.appendChild(tr);
+  }
+  if(!data.pipeline.length) pipeline.appendChild(Object.assign(document.createElement("tr"),{textContent:"No engagements"}));
+  if(!data.tasks.length) tasks.appendChild(Object.assign(document.createElement("tr"),{textContent:"No follow-up tasks yet"}));
+  message("Loaded "+data.pipeline.length+" engagements and "+data.tasks.length+" tasks");
+ }catch(e){message("Unable to load CRM: "+e.message);}
+}
+q("refresh").addEventListener("click",reload);
+q("generate").addEventListener("click",async()=>{try{
+ const r=await json("/api/staff/followups/run",{method:"POST"});
+ await reload();message("Follow-up check complete. "+r.created+" new tasks; "+r.alreadyExists+" already queued.");
+}catch(e){message(e.message);}});
+reload();
+</script></body></html>

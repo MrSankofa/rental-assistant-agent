@@ -119,8 +119,8 @@ function extractAnswer(response) {
     .join("\n");
 }
 
-async function askAI(question, previousResponseId = null) {
-  const instructions = `
+function buildInstructions({ followUpFormAvailable = false } = {}) {
+  return `
     You are a professional rental property assistant.
     Today's date is ${new Date().toISOString().slice(0, 10)}.
 
@@ -143,10 +143,16 @@ async function askAI(question, previousResponseId = null) {
     - Use getPropertyInformation for property-specific facts.
     - Never invent prices, policies, availability, amenities,
       application information, or property details.
-    - If rent is null, say the rent is currently unavailable.
+    - If rent is null, say no rent is currently advertised; do not quote an old rent.
+    - When available is false, clearly say there are no current vacancies.
+      Do not offer a showing, application, or suggest either is currently open.
+    - Never fabricate or display a placeholder application URL.
+    - Only offer application or showing links when a vacancy is available
+      and the corresponding real URL is present.
 
     SCHEDULING:
-    - If property information contains a showingUrl, that link is the
+    - Never offer showing appointments for properties with available=false.
+    - If property information contains a showingUrl and available=true, that link is the
       authoritative way to schedule a showing.
     - When the user asks to schedule or see the property, provide
       the showingUrl.
@@ -157,6 +163,11 @@ async function askAI(question, previousResponseId = null) {
     APPLICATIONS:
     - If applicationAvailableFrom is in the future, explain briefly
       that applications are not open yet and provide the opening date.
+    - You do not have any reminder, notification, calendar, email, or
+      SMS tools. Never offer to remind the visitor about future
+      openings, follow up automatically, or contact them later.
+    - If asked for a reminder, say that automated reminders are not
+      available and suggest they set their own calendar reminder.
 
     RESPONSE STYLE:
     - Answer only the question that was actually asked.
@@ -174,10 +185,21 @@ async function askAI(question, previousResponseId = null) {
     SAFETY:
     - Do not make tenant screening, qualification, approval, ranking,
       or denial decisions.
+    - Do not ask visitors to enter phone numbers, email addresses, or
+      other personal identifying details in the chat.
+    ${followUpFormAvailable ?
+      '- For staff follow-up, direct visitors to the optional "Request staff follow-up" form. Say that submitting it records an inquiry for staff review, not that someone has already been notified.' :
+      '- The staff follow-up form is currently disabled. Do not claim a form is visible, promise staff contact, or direct visitors to an unavailable form.'}
+    - Never claim that speaking in chat records an inquiry, creates a
+      CRM contact, sends a staff notification, or books a showing.
     - If information is unavailable, say so clearly.
 
     Be polite, helpful, and concise.
   `;
+}
+
+async function askAI(question, previousResponseId = null, { followUpFormAvailable = false } = {}) {
+  const instructions = buildInstructions({ followUpFormAvailable });
 
   const initialPayload = {
     model: "gpt-4.1-mini",
@@ -191,6 +213,12 @@ async function askAI(question, previousResponseId = null) {
   }
 
   let response = await requestOpenAI(initialPayload);
+  // Only server-verified property tool responses may preselect the follow-up form.
+  // This is UI context, not an identity or consent signal.
+  const verifiedProperties = new Set();
+  const formContext = () => ({
+    propertyId: verifiedProperties.size === 1 ? [...verifiedProperties][0] : null
+  });
 
   // Allow up to three consecutive rounds of tool calling.
   for (let round = 0; round < 3; round++) {
@@ -200,7 +228,8 @@ async function askAI(question, previousResponseId = null) {
     if (calls.length === 0) {
       return {
         answer: extractAnswer(response) || "No response generated.",
-        responseId: response.id
+        responseId: response.id,
+        ...formContext()
       };
     }
 
@@ -210,6 +239,13 @@ async function askAI(question, previousResponseId = null) {
       try {
         const args = JSON.parse(call.arguments || "{}");
         result = executeTool(call.name, args);
+        if (
+          (call.name === "getPropertyInformation" || call.name === "getShowingAvailability") &&
+          result && result.found === true &&
+          (args.propertyId === "virginia" || args.propertyId === "ziegler")
+        ) {
+          verifiedProperties.add(args.propertyId);
+        }
         console.log("Tool executed:", call.name, args);
       } catch (error) {
         result = { error: "Tool execution failed" };
@@ -233,8 +269,9 @@ async function askAI(question, previousResponseId = null) {
 
   return {
     answer: "I couldn't complete that request. Please try again.",
-    responseId: response.id
+    responseId: response.id,
+    ...formContext()
   };
 }
 
-module.exports = { askAI };
+module.exports = { askAI, buildInstructions };

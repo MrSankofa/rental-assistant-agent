@@ -25,5 +25,8 @@
   "bugs": {
     "url": "https://github.com/MrSankofa/rental-assistant-agent/issues"
   },
-  "homepage": "https://github.com/MrSankofa/rental-assistant-agent#readme"
+  "homepage": "https://github.com/MrSankofa/rental-assistant-agent#readme",
+  "engines": {
+    "node": ">=22 <23"
+  }
 }

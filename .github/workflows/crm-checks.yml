@@ -1,0 +1,23 @@
+name: CRM platform checks
+on:
+  push:
+    branches: [feature/crm-platform-mvp]
+  pull_request:
+    branches: [tenant-launch]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm test
+      - run: node scripts/crm-demo.js
+      - run: npm run build
+      - run: node --check server.js
+      - run: node --check src/crm/workflows.js
+      - run: node --check src/crm/storage.js
