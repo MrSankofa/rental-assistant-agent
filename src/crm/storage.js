@@ -94,8 +94,25 @@ class FirestoreStore {
     if (!doc || !doc.fields || !doc.fields.payload) throw new Error("Invalid CRM document");
     return { value: JSON.parse(doc.fields.payload.stringValue), version: doc.updateTime };
   }
-  encode(value) {
-    return { fields: { payload: { stringValue: JSON.stringify(value) } } };
+  encode(value, collection = "") {
+    const fields = {
+      payload: { stringValue: JSON.stringify(value) }
+    };
+
+    if (collection === "turnstile-replay-claims") {
+      const expiresAt = value && value.expiresAt;
+
+      if (typeof expiresAt !== "string" ||
+          !Number.isFinite(Date.parse(expiresAt))) {
+        throw new Error("Invalid replay claim expiration");
+      }
+
+      fields.expiresAt = {
+        timestampValue: new Date(expiresAt).toISOString()
+      };
+    }
+
+    return { fields };
   }
   async get(collection, id) {
     const doc = await this.request("GET", this.path(collection, id));
@@ -103,7 +120,7 @@ class FirestoreStore {
   }
   async create(collection, id, value) {
     try {
-      await this.request("POST", this.path(collection) + "?documentId=" + encodeURIComponent(id), this.encode(value));
+      await this.request("POST", this.path(collection) + "?documentId=" + encodeURIComponent(id), this.encode(value, collection));
       return true;
     } catch (error) {
       if (error instanceof StoreConflict) return false;

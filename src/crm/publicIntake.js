@@ -3,6 +3,7 @@
 const {stagingIntakeEnabled, validateFictionalIntake} = require("./stagingIntake");
 const {realIntakeEnabled, validateRealRentalIntake} = require("./realIntake");
 const {turnstileConfigured,verifyRealInquiry} = require("../http/turnstile");
+const {claimTurnstileToken} = require("../http/turnstileReplay");
 
 const httpError=(status,message)=>Object.assign(new Error(message),{status});
 
@@ -37,7 +38,10 @@ async function acceptPublicInquiry({env, crm, headers, body, lookupProperty, ver
   const validated=status.stagingTestMode
     ? validateFictionalIntake(body)
     : validateRealRentalIntake(body,lookupProperty);
-  if (status.realIntakeEnabled) await verify({env,token:body.turnstileToken});
+  if (status.realIntakeEnabled) {
+    await claimTurnstileToken({store:crm.store,token:body.turnstileToken});
+    await verify({env,token:body.turnstileToken});
+  }
   return crm.intake(validated,{origin:"public",actor:"prospect"});
 }
 
