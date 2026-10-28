@@ -1,18 +1,36 @@
 const { getSuggestedQuestions } = require("./suggestedQuestions");
 
 describe("rental assistant guided questions", () => {
-  test("welcome suggestions help start without a typed prompt", () => {
+  test("welcome suggestions contain informational questions only", () => {
     const prompts = getSuggestedQuestions();
-    expect(prompts).toHaveLength(4);
+
+    expect(prompts).toHaveLength(3);
+
     expect(prompts.map(x => x.label)).toEqual([
-      "See available rentals", "Explore Ziegler", "Schedule a tour", "Application timeline"
+      "See available rentals",
+      "Explore Ziegler",
+      "Application timeline"
     ]);
-    expect(prompts.every(x => x.question.endsWith("?") || x.question.endsWith("."))).toBe(true);
+
+    expect(prompts.some(x => x.label === "Schedule a tour")).toBe(false);
+
+    expect(
+      prompts.every(
+        x => x.question.endsWith("?") || x.question.endsWith(".")
+      )
+    ).toBe(true);
   });
-  test("verified Ziegler context generates relevant next steps", () => {
+  test("verified Ziegler context keeps actions separate from questions", () => {
     const questions = getSuggestedQuestions("ziegler");
-    expect(questions.some(x => x.question.includes("tour at Ziegler"))).toBe(true);
-    expect(questions.some(x => x.question.includes("apply for Ziegler"))).toBe(true);
+
+    expect(questions.map(x => x.label)).toEqual([
+      "When to apply",
+      "Lease and parking"
+    ]);
+
+    expect(
+      questions.some(x => x.label === "Schedule a tour")
+    ).toBe(false);
   });
   test("unavailable Virginia does not suggest a Virginia showing or application", () => {
     const questions = getSuggestedQuestions("virginia");
