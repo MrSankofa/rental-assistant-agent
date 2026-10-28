@@ -43,7 +43,7 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
   const pipeline = engagements.map(e => {
     const contact = byId.get(e.contactId);
     return {
-      id:e.id, property:e.targetId, stage:e.stage,
+      id:e.id, property:e.targetId, interest:e.interest||"", stage:e.stage,
       nextAction:e.nextAction||"", updatedAt:e.updatedAt, createdAt:e.createdAt,
       contact:contact ? {name:contact.name,email:contact.email,phone:contact.phone,
         consent:contact.consent,preferredChannel:contact.preferredChannel} : null

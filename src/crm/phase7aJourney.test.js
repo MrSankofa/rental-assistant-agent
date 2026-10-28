@@ -181,3 +181,108 @@ test("wrong signed invitee and invalid signature never turn the offered link int
   })).rejects.toHaveProperty("status",401);
   expect((await crm.listEngagements())[0].stage).toBe("TOUR_OFFERED");
 });
+
+
+test("phone-only tour inquiry is recorded and offered Calendly with manual-match warning",async()=>{
+  const {crm,submit}=fixture();
+
+  const response=await submit(inquiry({
+    email:"",
+    phone:"+13135550123",
+    preferredChannel:"none"
+  }));
+
+  expect(response).toMatchObject({
+    received:true,
+    nextSteps:{
+      showingAvailable:true,
+      showingUrl,
+      bookingRecorded:false,
+      propertyId:"ziegler"
+    }
+  });
+
+  const contacts=await crm.listContacts();
+  const engagements=await crm.listEngagements();
+
+  expect(contacts).toHaveLength(1);
+  expect(contacts[0]).toMatchObject({
+    email:"",
+    phone:"13135550123",
+    preferredChannel:"none"
+  });
+
+  expect(engagements[0]).toMatchObject({
+    interest:"Tour inquiry",
+    stage:"TOUR_OFFERED",
+    nextAction:"Await Calendly booking; phone-only contact may require staff matching"
+  });
+});
+
+test("human follow-up is recorded for staff and never offers Calendly",async()=>{
+  const {crm,submit}=fixture();
+
+  const response=await submit(inquiry({
+    interest:"Human follow-up"
+  }));
+
+  expect(response).toEqual({
+    received:true,
+    message:expect.any(String)
+  });
+
+  const engagements=await crm.listEngagements();
+
+  expect(engagements).toHaveLength(1);
+  expect(engagements[0]).toMatchObject({
+    interest:"Human follow-up",
+    stage:"CONTACT_CAPTURED",
+    nextAction:"Landlord/property manager follow up"
+  });
+
+  expect(await crm.store.list("bookings")).toHaveLength(0);
+});
+
+test("existing tour prospect can later request human follow-up",async()=>{
+  const {crm,submit}=fixture();
+
+  await submit();
+
+  await submit(inquiry({
+    interest:"Human follow-up"
+  }));
+
+  const engagements=await crm.listEngagements();
+
+  expect(engagements).toHaveLength(1);
+  expect(engagements[0]).toMatchObject({
+    interest:"Human follow-up",
+    nextAction:"Landlord/property manager follow up"
+  });
+});
+
+test("existing human-follow-up prospect can later request a tour",async()=>{
+  const {crm,submit}=fixture();
+
+  await submit(inquiry({
+    interest:"Human follow-up"
+  }));
+
+  const response=await submit();
+
+  expect(response).toMatchObject({
+    nextSteps:{
+      showingAvailable:true,
+      bookingRecorded:false,
+      propertyId:"ziegler"
+    }
+  });
+
+  const engagements=await crm.listEngagements();
+
+  expect(engagements).toHaveLength(1);
+  expect(engagements[0]).toMatchObject({
+    interest:"Tour inquiry",
+    stage:"TOUR_OFFERED"
+  });
+});

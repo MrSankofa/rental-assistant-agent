@@ -10,11 +10,11 @@
   const welcome = [
     { label: "See available rentals", question: "Which properties currently have vacancies?" },
     { label: "Explore Ziegler", question: "Tell me about the Ziegler property." },
-    { label: "Schedule a showing", question: "How can I schedule a showing at Ziegler?" },
+    { label: "Schedule a tour", question: "How can I schedule a tour at Ziegler?" },
     { label: "Application timeline", question: "When can I apply for Ziegler?" }
   ];
   const ziegler = [
-    { label: "Showing link", question: "How can I schedule a showing at Ziegler?" },
+    { label: "Schedule a tour", question: "How can I schedule a tour at Ziegler?" },
     { label: "When to apply", question: "When can I apply for Ziegler?" },
     { label: "Lease and parking", question: "What are the lease and parking details for Ziegler?" }
   ];

@@ -156,7 +156,7 @@ function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAva
       authoritative way to schedule a showing.
     - When the user asks to schedule or see the property,
       ${guidedShowingFormAvailable ?
-        "direct them to the Schedule a showing option and its short contact form before Calendly; do not output the showingUrl in the chat." :
+        "direct them to the Schedule a tour option and its short contact form before Calendly; do not output the showingUrl in the chat." :
         "provide the showingUrl."}
     - Do not claim a showing has been booked unless the user completes
       scheduling through the provided link.
@@ -184,7 +184,7 @@ function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAva
     - Avoid repeating facts the user did not ask about.
     - You may offer one brief next step when useful.
     ${guidedShowingFormAvailable ?
-      '- If a visitor expresses interest in viewing Ziegler, suggest the "Schedule a showing" action, which collects only first name, last name, and email. Do not ask for contact details in free-text chat.' : '' }
+      '- If a visitor expresses interest in viewing Ziegler, suggest the "Schedule a tour" action. It collects first name, last name, and at least one contact method: email or phone. Do not ask for contact details in free-text chat.' : '' }
 
     SAFETY:
     - Do not make tenant screening, qualification, approval, ranking,
@@ -192,7 +192,7 @@ function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAva
     - Do not ask visitors to enter phone numbers, email addresses, or
       other personal identifying details in the chat.
     ${followUpFormAvailable ?
-      '- For staff follow-up, direct visitors to the optional "Request staff follow-up" form. Say that submitting it records an inquiry for staff review, not that someone has already been notified.' :
+      '- If a visitor wants to talk with the landlord, property manager, or another person, direct them to "Speak with a human". The form collects first name, last name, and at least one contact method: email or phone. Say that submitting it records a request for staff review, not that someone has already been notified.' :
       '- The staff follow-up form is currently disabled. Do not claim a form is visible, promise staff contact, or direct visitors to an unavailable form.'}
     - Never claim that speaking in chat records an inquiry, creates a
       CRM contact, sends a staff notification, or books a showing.
