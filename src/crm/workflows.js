@@ -87,15 +87,96 @@ class CRM {
     }
   }
   const engagementId="e_"+hash(contactId+"|"+domain+"|"+targetId).slice(0,40);
+  const nextAction =
+    domain === "rental" && interest === "Human follow-up"
+      ? "Landlord/property manager follow up"
+      : "Staff review intake";
+
   const engagement={id:engagementId,contactId,domain,targetId,source,interest,
     stage:domain==="rental"?"CONTACT_CAPTURED":"INTEREST_RECORDED",
-    nextAction:"Staff review intake",nextActionOwner:"staff",nextActionAt:now,
+    nextAction,nextActionOwner:"staff",nextActionAt:now,
     createdAt:now,updatedAt:now,history:[{at:now,actor,stage:domain==="rental"?"CONTACT_CAPTURED":"INTEREST_RECORDED"}]};
   const wasCreated=await this.store.create("engagements",engagementId,engagement);
+
   if(wasCreated) {
     const interactionId=id();
-    await this.store.create("interactions",interactionId,{id:interactionId,engagementId,direction:"inbound",channel:"form",source,summary:"Consented contact intake",at:now});
-    await this.audit(actor,"intake",engagementId,{domain,targetId,source});
+    await this.store.create("interactions",interactionId,{
+      id:interactionId,
+      engagementId,
+      direction:"inbound",
+      channel:"form",
+      source,
+      summary:"Consented contact intake",
+      at:now
+    });
+
+    await this.audit(actor,"intake",engagementId,{
+      domain,targetId,source
+    });
+  } else {
+    // One engagement represents this prospect + property relationship.
+    // A later form submission may change what the prospect is asking for
+    // without creating a duplicate engagement or rewinding its stage.
+    let updated=false;
+
+    for(let attempt=0;attempt<4;attempt++) {
+      const row=await this.store.get("engagements",engagementId);
+      if(!row) throw new StoreConflict();
+
+      const existing=row.value;
+
+      const latestNextAction =
+        domain==="rental" && interest==="Human follow-up"
+          ? "Landlord/property manager follow up"
+          : "Staff review intake";
+
+      if(existing.interest===interest &&
+         existing.nextAction===latestNextAction) {
+        updated=true;
+        break;
+      }
+
+      const revised={
+        ...existing,
+        interest,
+        nextAction:latestNextAction,
+        nextActionOwner:"staff",
+        nextActionAt:now,
+        updatedAt:now
+      };
+
+      try {
+        await this.store.replace(
+          "engagements",
+          engagementId,
+          revised,
+          row.version
+        );
+
+        const interactionId=id();
+
+        await this.store.create("interactions",interactionId,{
+          id:interactionId,
+          engagementId,
+          direction:"inbound",
+          channel:"form",
+          source,
+          summary:"Updated rental request: "+interest,
+          at:now
+        });
+
+        await this.audit(actor,"intake-updated",engagementId,{
+          domain,targetId,source,interest
+        });
+
+        updated=true;
+        break;
+      } catch(error) {
+        if(!(error instanceof StoreConflict)) throw error;
+      }
+    }
+
+    if(!updated) throw new StoreConflict();
   }
   // Public callers receive no internal IDs, contact fields, or existence information.
   return origin==="public"?{received:true,message:"Thank you. Your inquiry has been recorded."}:

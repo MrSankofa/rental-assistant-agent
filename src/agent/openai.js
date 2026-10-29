@@ -119,14 +119,20 @@ function extractAnswer(response) {
     .join("\n");
 }
 
-function buildInstructions({ followUpFormAvailable = false } = {}) {
+function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAvailable = false } = {}) {
   return `
     You are a professional rental property assistant.
     Today's date is ${new Date().toISOString().slice(0, 10)}.
 
     Property IDs available:
-    - virginia: Virginia Park St, Detroit
-    - ziegler: 4932 Ziegler St, Dearborn Heights
+    - virginia: Detroit rental, Virginia Park St, Detroit
+    - ziegler: Dearborn Heights rental, 4932 Ziegler St, Dearborn Heights
+
+    PROPERTY NAMING:
+    - Refer to the rentals as the Detroit rental and Dearborn Heights rental.
+    - Treat virginia and ziegler as internal IDs, not customer-facing names.
+    - Introduce properties by city. Provide their street addresses when requested
+      or when the visitor needs location details.
 
     CONVERSATION:
     - Remember the property established earlier in the conversation.
@@ -154,8 +160,10 @@ function buildInstructions({ followUpFormAvailable = false } = {}) {
     - Never offer showing appointments for properties with available=false.
     - If property information contains a showingUrl and available=true, that link is the
       authoritative way to schedule a showing.
-    - When the user asks to schedule or see the property, provide
-      the showingUrl.
+    - When the user asks to schedule or see the property,
+      ${guidedShowingFormAvailable ?
+        "direct them to the Schedule a tour option and its short contact form before Calendly; do not output the showingUrl in the chat." :
+        "provide the showingUrl."}
     - Do not claim a showing has been booked unless the user completes
       scheduling through the provided link.
     - Do not use getShowingAvailability when a showingUrl is available.
@@ -181,6 +189,8 @@ function buildInstructions({ followUpFormAvailable = false } = {}) {
     - Output URLs as plain https:// URLs on their own line.
     - Avoid repeating facts the user did not ask about.
     - You may offer one brief next step when useful.
+    ${guidedShowingFormAvailable ?
+      '- If a visitor expresses interest in viewing the Dearborn Heights rental, suggest the "Schedule a tour" action. It collects first name, last name, and at least one contact method: email or phone. Do not ask for contact details in free-text chat.' : '' }
 
     SAFETY:
     - Do not make tenant screening, qualification, approval, ranking,
@@ -188,7 +198,7 @@ function buildInstructions({ followUpFormAvailable = false } = {}) {
     - Do not ask visitors to enter phone numbers, email addresses, or
       other personal identifying details in the chat.
     ${followUpFormAvailable ?
-      '- For staff follow-up, direct visitors to the optional "Request staff follow-up" form. Say that submitting it records an inquiry for staff review, not that someone has already been notified.' :
+      '- If a visitor wants to talk with the landlord, property manager, or another person, direct them to "Speak with a human". The form collects first name, last name, and at least one contact method: email or phone. Say that submitting it records a request for staff review, not that someone has already been notified.' :
       '- The staff follow-up form is currently disabled. Do not claim a form is visible, promise staff contact, or direct visitors to an unavailable form.'}
     - Never claim that speaking in chat records an inquiry, creates a
       CRM contact, sends a staff notification, or books a showing.
@@ -198,8 +208,8 @@ function buildInstructions({ followUpFormAvailable = false } = {}) {
   `;
 }
 
-async function askAI(question, previousResponseId = null, { followUpFormAvailable = false } = {}) {
-  const instructions = buildInstructions({ followUpFormAvailable });
+async function askAI(question, previousResponseId = null, { followUpFormAvailable = false, guidedShowingFormAvailable = false } = {}) {
+  const instructions = buildInstructions({ followUpFormAvailable, guidedShowingFormAvailable });
 
   const initialPayload = {
     model: "gpt-4.1-mini",

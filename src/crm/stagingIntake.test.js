@@ -34,10 +34,30 @@ describe("private staging intake security", () => {
     expect(validateFictionalIntake(valid)).toMatchObject({
       email:"fictional-staging@example.test",source:"private-staging-form"
     });
+
+    expect(validateFictionalIntake({
+      ...valid,
+      email:"",
+      phone:"+13135550123",
+      preferredChannel:"none"
+    })).toMatchObject({
+      email:"",
+      phone:"13135550123",
+      preferredChannel:"none",
+      source:"private-staging-form"
+    });
+
+    expect(validateFictionalIntake({
+      ...valid,
+      interest:"Human follow-up"
+    })).toMatchObject({
+      interest:"Human follow-up"
+    });
     for (const body of [
       {...valid,name:"Real Person"},
       {...valid,email:"someone@gmail.com"},
-      {...valid,phone:"+15555550123"},
+      {...valid,email:"",phone:"+13135551234"},
+      {...valid,email:"",phone:""},
       {...valid,interest:"My real address is 123 Main St"},
       {...valid,targetId:"virginia"},
       {...valid,consent:{recording:false,email:false,sms:false}},

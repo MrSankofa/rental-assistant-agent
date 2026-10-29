@@ -9,18 +9,16 @@
 })(typeof window !== "undefined" ? window : null, function () {
   const welcome = [
     { label: "See available rentals", question: "Which properties currently have vacancies?" },
-    { label: "Explore Ziegler", question: "Tell me about the Ziegler property." },
-    { label: "Schedule a showing", question: "How can I schedule a showing at Ziegler?" },
-    { label: "Application timeline", question: "When can I apply for Ziegler?" }
+    { label: "Explore Dearborn Heights", question: "Tell me about the Dearborn Heights rental." },
+    { label: "Application timeline", question: "When can I apply for the Dearborn Heights rental?" }
   ];
   const ziegler = [
-    { label: "Showing link", question: "How can I schedule a showing at Ziegler?" },
-    { label: "When to apply", question: "When can I apply for Ziegler?" },
-    { label: "Lease and parking", question: "What are the lease and parking details for Ziegler?" }
+    { label: "When to apply", question: "When can I apply for the Dearborn Heights rental?" },
+    { label: "Lease and parking", question: "What are the lease and parking details for the Dearborn Heights rental?" }
   ];
   const virginia = [
     { label: "See available rentals", question: "Which properties currently have vacancies?" },
-    { label: "Explore Ziegler", question: "Tell me about the Ziegler property." }
+    { label: "Explore Dearborn Heights", question: "Tell me about the Dearborn Heights rental." }
   ];
   function getSuggestedQuestions(propertyId = null, lastAsked = "") {
     const options = propertyId === "ziegler" ? ziegler :

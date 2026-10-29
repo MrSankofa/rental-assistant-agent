@@ -150,7 +150,8 @@
           <p>Hi! I'm your rental assistant. Ask me a question, or choose a starting point below. I can help you explore a rental, find its showing link, and understand application timing.</p>
           <div id="assistantActions" class="assistant-actions">
             <div id="suggestions" class="suggestion-list" role="group" aria-label="Suggested questions"></div>
-            <button id="followUpJump" class="secondary-action" type="button" hidden>Request staff follow-up</button>
+            <button id="scheduleTourJump" class="secondary-action" type="button" hidden>Schedule a tour</button>
+            <button id="humanHelpJump" class="secondary-action" type="button" hidden>Speak with a human</button>
           </div>
           <div class="journey">Explore a property &rarr; Schedule through its verified link &rarr; Apply when available &rarr; Staff review</div>
           </div>
@@ -158,18 +159,26 @@
         <div id="contactIntakeTurn" class="chat-turn assistant" hidden>
           <span class="chat-avatar assistant" aria-hidden="true"><img src="/assets/brand/logo-mark-64.png" alt=""></span>
           <section id="contactIntake" class="message assistant intake-card" hidden aria-labelledby="contactHeading">
-          <span class="eyebrow">Staff follow-up</span>
+          <span class="eyebrow" id="intakeEyebrow">Staff follow-up</span>
           <h2 id="contactHeading">Let me pass your inquiry to our team.</h2>
           <p id="leadDescription">Complete the details below so staff can review your inquiry. This does not reserve a showing or send an immediate message.</p>
           <p id="privacyNotice" hidden>We use the information you provide to respond to your rental inquiry. <a id="privacyLink" target="_blank" rel="noopener noreferrer">Read our privacy notice</a>.</p>
           <form id="leadForm" class="lead-form">
             <div class="field-heading">Your contact details</div>
             <div class="field-row">
-              <label class="field">Full name <input name="name" autocomplete="name" required maxlength="100" placeholder="Your name"></label>
-              <label class="field">Email address <input name="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@example.com"></label>
+              <label class="field">First name <input name="firstName" autocomplete="given-name" required maxlength="40" placeholder="First name"></label>
+              <label class="field">Last name <input name="lastName" autocomplete="family-name" required maxlength="40" placeholder="Last name"></label>
             </div>
-            <input name="phone" type="hidden" value="">
-            <input name="preferredChannel" type="hidden" value="email">
+            <div class="field-row">
+              <label class="field">Email address
+                <input name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">
+              </label>
+              <label class="field">Phone number
+                <input name="phone" type="tel" autocomplete="tel" maxlength="32" placeholder="313-555-0100">
+              </label>
+            </div>
+            <p class="muted">Provide at least one contact method: email or phone.</p>
+            <div id="inquiryExtraFields">
             <div class="field-heading">Your rental inquiry</div>
             <div class="field-row">
               <label class="field">Property
@@ -183,8 +192,9 @@
                 <input name="interest" maxlength="200" required placeholder="Tour inquiry, application, etc.">
               </label>
             </div>
+            </div>
             <div class="field-heading">Your preferences</div>
-            <label class="choice-label"><input type="checkbox" name="recording" required> I agree to have these details recorded so staff can review my inquiry. <span aria-hidden="true">*</span></label>
+            <label class="choice-label"><input type="checkbox" name="recording" required> I agree to have my information recorded for this rental inquiry. <span aria-hidden="true">*</span></label>
             <label class="choice-label"><input type="checkbox" name="emailConsent"> I agree to optional email follow-ups (not required).</label>
             <input type="checkbox" name="smsConsent" hidden>
             <div id="humanVerification" hidden></div>
@@ -197,9 +207,9 @@
           <span class="chat-avatar assistant" aria-hidden="true"><img src="/assets/brand/logo-mark-64.png" alt=""></span>
           <section id="showingNextStep" hidden class="message assistant next-step" aria-labelledby="showingNextHeading">
           <h2 id="showingNextHeading">Next step: schedule your showing</h2>
-          <p>Your inquiry is recorded for staff review. To request a showing time, complete the verified Calendly scheduling process. Opening the link alone does not book a showing.</p>
+          <p>Your inquiry has been recorded. If you provided an email address, use the same email when choosing a showing time so the booking can be matched automatically. Phone-only inquiries may require staff review. Opening the link alone does not book a showing.</p>
           <a id="showingNextLink" target="_blank" rel="noopener noreferrer">Continue to Calendly scheduling</a>
-          <p>The assistant does not automatically record or confirm Calendly reservations in the CRM.</p>
+          <p>A showing is confirmed only after Calendly verifies the booking and the CRM matches it. Until then, staff may need to review the reservation.</p>
           </section>
         </div>
       </div>
@@ -214,7 +224,8 @@
   <script src="/assets/suggested-questions.js"></script>
   <script>
 
-    const followUpJump = document.getElementById("followUpJump");
+    const scheduleTourJump = document.getElementById("scheduleTourJump");
+    const humanHelpJump = document.getElementById("humanHelpJump");
     const contactIntake = document.getElementById("contactIntake");
     const contactIntakeTurn = document.getElementById("contactIntakeTurn");
     const showingNextTurn = document.getElementById("showingNextTurn");
@@ -222,15 +233,56 @@
     const propertySelect = leadForm.elements.namedItem("targetId");
     const messages = document.getElementById("messages");
     const assistantActions = document.getElementById("assistantActions");
-    followUpJump.addEventListener("click", () => {
-      if (contactIntake.hidden) {
-        addMessage("I'd like staff to follow up with me.", "user");
-        contactIntake.hidden = false;
-        contactIntakeTurn.hidden = false;
-      }
+    function openLeadForm(mode) {
+      const showing = mode === "showing";
+      const human = mode === "human";
+
+      if (!showing && !human) return false;
+
+      const trigger = showing ? scheduleTourJump : humanHelpJump;
+      if (trigger.hidden) return false;
+
+      propertySelect.value = "ziegler";
+
+      document.getElementById("intakeEyebrow").textContent =
+        showing ? "Schedule a tour" : "Speak with a human";
+
+      document.getElementById("contactHeading").textContent =
+        showing
+          ? "Let's schedule your Ziegler tour."
+          : "Have the landlord or property manager contact you.";
+
+      document.getElementById("leadDescription").textContent =
+        showing
+          ? "Provide your first name, last name, and either an email address or phone number. After your inquiry is recorded, you can continue to available showing times."
+          : "Provide your first name, last name, and either an email address or phone number. Your request will be recorded so the landlord or property manager can review it and reach out.";
+
+      document.getElementById("inquiryExtraFields").hidden = true;
+
+      document.getElementById("submitInquiry").textContent =
+        showing ? "Continue to showing times" : "Request human follow-up";
+
+      leadForm.dataset.intent = showing ? "showing" : "human";
+
+      leadForm.elements.namedItem("interest").value =
+        showing ? "Tour inquiry" : "Human follow-up";
+
+      contactIntake.hidden = false;
+      contactIntakeTurn.hidden = false;
       messages.appendChild(contactIntakeTurn);
       messages.scrollTop = messages.scrollHeight;
-      leadForm.elements.namedItem("name").focus({ preventScroll: true });
+      leadForm.elements.namedItem("firstName").focus({ preventScroll: true });
+      return true;
+    }
+
+    scheduleTourJump.addEventListener("click", () => {
+      addMessage("I'd like to schedule a tour.", "user");
+      openLeadForm("showing");
+    });
+
+    humanHelpJump.addEventListener("click", () => {
+      addMessage("I'd like to speak with the landlord or property manager.", "user");
+      openLeadForm("human");
     });
     let isLiveIntake = false;
     let turnstileReady = false;
@@ -238,8 +290,10 @@
     window.onRentalTurnstileLoaded = () => { turnstileReady = true; };
     fetch("/api/crm/status").then(r => r.json()).then(status => {
       if (status.publicIntakeEnabled && status.stagingTestMode) {
-        followUpJump.hidden = false;
-        leadForm.elements.namedItem("name").value = "Fictional Browser";
+        scheduleTourJump.hidden = false;
+        humanHelpJump.hidden = false;
+        leadForm.elements.namedItem("firstName").value = "Fictional";
+        leadForm.elements.namedItem("lastName").value = "Browser";
         leadForm.elements.namedItem("email").value = "fictional-browser@example.test";
         leadForm.elements.namedItem("emailConsent").disabled = true;
         const interestField = leadForm.elements.namedItem("interest");
@@ -269,7 +323,8 @@
           display();
         };
         document.head.appendChild(script);
-        followUpJump.hidden = false;
+        scheduleTourJump.hidden = false;
+        humanHelpJump.hidden = false;
         document.getElementById("leadDescription").textContent =
           "Ask our staff about Ziegler. Your information is recorded so we can respond; submitting this form does not book a showing or send an automatic message.";
         document.getElementById("privacyLink").href = status.privacyUrl;
@@ -284,7 +339,7 @@
         choice.name = "interest";
         choice.required = true;
         choice.style.padding = "12px";
-        for (const value of ["Tour inquiry","Application information","General property question"]) {
+        for (const value of ["Tour inquiry","Human follow-up","Application information","General property question"]) {
           const opt = document.createElement("option"); opt.value = value; opt.textContent = value;
           choice.appendChild(opt);
         }
@@ -297,6 +352,21 @@
       const leadForm = event.currentTarget;
       const status = document.getElementById("leadStatus");
       const values = new FormData(leadForm);
+      const email = String(values.get("email") || "").trim();
+      const phone = String(values.get("phone") || "").trim();
+      const intent = leadForm.dataset.intent || "";
+
+      if (!email && !phone) {
+        status.textContent = "Please provide an email address or phone number.";
+        return;
+      }
+
+      if (!email && values.get("emailConsent") === "on") {
+        status.textContent =
+          "Enter an email address or uncheck optional email follow-ups.";
+        return;
+      }
+
       status.textContent = "Submitting...";
       const turnstileToken = isLiveIntake && window.turnstile && turnstileWidgetId !== null
         ? window.turnstile.getResponse(turnstileWidgetId) : "";
@@ -310,11 +380,13 @@
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({
             turnstileToken,
-            name: values.get("name"), email: values.get("email")||"",
-            phone: values.get("phone")||"",
+            name: String(values.get("firstName") || "").trim() + " " +
+              String(values.get("lastName") || "").trim(),
+            email,
+            phone,
             targetId:values.get("targetId"), domain:"rental",
             source:"rental-assistant-web",interest:values.get("interest")||"",
-            preferredChannel:values.get("preferredChannel"),
+            preferredChannel: email ? "email" : "none",
             consent: {
               recording: values.get("recording")==="on",
               email: values.get("emailConsent")==="on",
@@ -330,19 +402,22 @@
         nextSection.hidden = true;
         nextLink.removeAttribute("href");
         try {
-          const nextResponse = await fetch("/api/crm/staging-next-steps", {cache:"no-store"});
-          if (nextResponse.ok) {
-            const steps = await nextResponse.json();
-            if (steps.showingAvailable && steps.propertyId === "ziegler" &&
-                steps.bookingRecorded === false && typeof steps.showingUrl === "string") {
-              const verified = new URL(steps.showingUrl);
-              if (verified.protocol === "https:" && verified.hostname === "calendly.com") {
-                nextLink.href = verified.href;
-                nextSection.hidden = false;
-                showingNextTurn.hidden = false;
-                messages.appendChild(showingNextTurn);
-                messages.scrollTop = messages.scrollHeight;
-              }
+          // Staging: only show a link that was offered AND recorded by intake.
+          // Preserve the earlier read-only link path for separate live-intake work.
+          let steps = result.nextSteps || null;
+          if (!steps && isLiveIntake) {
+            const nextResponse = await fetch("/api/crm/staging-next-steps", {cache:"no-store"});
+            if (nextResponse.ok) steps = await nextResponse.json();
+          }
+          if (steps && steps.showingAvailable && steps.propertyId === "ziegler" &&
+              steps.bookingRecorded === false && typeof steps.showingUrl === "string") {
+            const verified = new URL(steps.showingUrl);
+            if (verified.protocol === "https:" && verified.hostname === "calendly.com") {
+              nextLink.href = verified.href;
+              nextSection.hidden = false;
+              showingNextTurn.hidden = false;
+              messages.appendChild(showingNextTurn);
+              messages.scrollTop = messages.scrollHeight;
             }
           }
         } catch (_) {
@@ -353,7 +428,11 @@
         contactIntakeTurn.hidden = true;
         const notice = document.getElementById("leadStatus");
         notice.textContent = "";
-        addMessage("Thank you. Your inquiry has been recorded for staff review. No showing has been booked and no automatic message has been sent.", "assistant");
+        addMessage(result.nextSteps?.showingAvailable
+          ? "Your contact details are saved. Now select a showing time using Calendly. Nothing is booked yet."
+          : intent === "human"
+            ? "Your request to speak with a human has been recorded for staff review. The landlord or property manager can see the request and your contact information. No automatic message has been sent."
+            : "Thank you. Your inquiry has been recorded for staff review. No showing has been booked and no automatic message has been sent.", "assistant");
         if (isLiveIntake && window.turnstile && turnstileWidgetId !== null) window.turnstile.reset(turnstileWidgetId);
       } catch(error) {
         if (isLiveIntake && window.turnstile && turnstileWidgetId !== null) window.turnstile.reset(turnstileWidgetId);
@@ -384,6 +463,12 @@
         chip.disabled = button.disabled;
         chip.addEventListener("click", () => {
           if (button.disabled) return;
+          if (["Schedule a tour"].includes(item.label) &&
+              !scheduleTourJump.hidden && propertySelect.value === "ziegler") {
+            addMessage("I'd like to schedule a showing at Ziegler.", "user");
+            openLeadForm("showing");
+            return;
+          }
           input.value = item.question;
           form.requestSubmit();
         });
@@ -523,9 +608,21 @@
         // No contact details or conversation content are submitted automatically.
         if (data.propertyId === "virginia" || data.propertyId === "ziegler") {
           currentPropertyId = data.propertyId;
-          if (!followUpJump.hidden && data.propertyId === "ziegler") {
+          if (!scheduleTourJump.hidden && data.propertyId === "ziegler") {
             propertySelect.value = data.propertyId;
           }
+        }
+        // An explicit typed request can also open the guided form.
+        // General property questions never capture details automatically.
+        if (!scheduleTourJump.hidden && propertySelect.value === "ziegler" &&
+            /\b(?:schedule|book|arrange)\s+(?:a\s+)?(?:showing|tour|visit)\b/i.test(question) &&
+            !/\b(?:don't|do not|not going to|cancel)\b/i.test(question)) {
+          openLeadForm("showing");
+        }
+
+        if (!humanHelpJump.hidden &&
+            /\b(?:speak|talk|contact)\b[\s\S]{0,40}\b(?:human|person|landlord|property manager|manager)\b/i.test(question)) {
+          openLeadForm("human");
         }
       } catch (error) {
         addMessage(

@@ -20,7 +20,7 @@ button{background:#245bd5;color:white;border:0;cursor:pointer}button:disabled{op
 <div class="toolbar"><button id="refresh" type="button">Refresh records</button>
 <button id="generate" type="button">Check due follow-ups</button>
 <span id="message" class="status" role="status" aria-live="polite"></span></div></header>
-<section><h2>Prospect pipeline</h2><div class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
+<section><h2>Prospect pipeline</h2><div class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Request</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
 <section><h2>Follow-up review queue</h2><p class="muted">Generate or edit a draft, approve it, then simulate delivery. No real email will be sent.</p>
 <div class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
 </main><script>
@@ -42,8 +42,16 @@ async function reload(){
   q("generate").hidden=live;
   for(const e of data.pipeline){
    const tr=document.createElement("tr");
-   cell(tr,e.contact?e.contact.name+" ("+(e.contact.email||e.contact.phone)+")":"Unknown contact");
-   cell(tr,e.property);cell(tr,e.stage);cell(tr,e.nextAction);
+   const contactMethods=e.contact
+     ? [e.contact.email,e.contact.phone].filter(Boolean).join(" | ")
+     : "";
+   cell(tr,e.contact
+     ? e.contact.name+(contactMethods?" ("+contactMethods+")":"")
+     : "Unknown contact");
+   cell(tr,e.property);
+   cell(tr,e.interest||"General inquiry");
+   cell(tr,e.stage);
+   cell(tr,e.nextAction);
    const controls=document.createElement("td");
    const next=e.stage==="CONTACT_CAPTURED"?"TOUR_OFFERED":e.stage==="TOUR_OFFERED"?"TOUR_SCHEDULED":"";
    if(next && !live){
