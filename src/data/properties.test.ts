@@ -1,6 +1,11 @@
 import { properties } from "./properties";
 
 describe("property listing integrity", () => {
+  test("rentals use city-facing names", () => {
+    expect(properties.ziegler.name).toBe("Dearborn Heights rental");
+    expect(properties.virginia.name).toBe("Detroit rental");
+  });
+
   test("Virginia has no vacancies, advertised rent, or application/showing link", () => {
     const virginia = properties.virginia;
     expect(virginia.available).toBe(false);

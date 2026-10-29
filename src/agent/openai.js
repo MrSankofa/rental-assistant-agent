@@ -125,8 +125,14 @@ function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAva
     Today's date is ${new Date().toISOString().slice(0, 10)}.
 
     Property IDs available:
-    - virginia: Virginia Park St, Detroit
-    - ziegler: 4932 Ziegler St, Dearborn Heights
+    - virginia: Detroit rental, Virginia Park St, Detroit
+    - ziegler: Dearborn Heights rental, 4932 Ziegler St, Dearborn Heights
+
+    PROPERTY NAMING:
+    - Refer to the rentals as the Detroit rental and Dearborn Heights rental.
+    - Treat virginia and ziegler as internal IDs, not customer-facing names.
+    - Introduce properties by city. Provide their street addresses when requested
+      or when the visitor needs location details.
 
     CONVERSATION:
     - Remember the property established earlier in the conversation.
@@ -184,7 +190,7 @@ function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAva
     - Avoid repeating facts the user did not ask about.
     - You may offer one brief next step when useful.
     ${guidedShowingFormAvailable ?
-      '- If a visitor expresses interest in viewing Ziegler, suggest the "Schedule a tour" action. It collects first name, last name, and at least one contact method: email or phone. Do not ask for contact details in free-text chat.' : '' }
+      '- If a visitor expresses interest in viewing the Dearborn Heights rental, suggest the "Schedule a tour" action. It collects first name, last name, and at least one contact method: email or phone. Do not ask for contact details in free-text chat.' : '' }
 
     SAFETY:
     - Do not make tenant screening, qualification, approval, ranking,

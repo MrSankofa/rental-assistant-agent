@@ -8,7 +8,7 @@ describe("rental assistant guided questions", () => {
 
     expect(prompts.map(x => x.label)).toEqual([
       "See available rentals",
-      "Explore Ziegler",
+      "Explore Dearborn Heights",
       "Application timeline"
     ]);
 

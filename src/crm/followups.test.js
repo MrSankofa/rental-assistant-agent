@@ -17,7 +17,7 @@ describe("safe scheduled rental follow-ups",()=>{
     const [task]=await crm.listTasks();
     expect(task.status).toBe("pending-approval");
     expect(task.automatedDelivery).toBe(false);
-    expect(task.draft).toContain("Ziegler");
+    expect(task.draft).toContain("Dearborn Heights rental");
     expect(task.dueAt).toBe(new Date(start+24*3600000).toISOString());
     expect((await generateFollowupTasks(crm,{now:new Date(start+26*3600000)})).alreadyExists).toBe(1);
     expect(await crm.listTasks()).toHaveLength(1);
