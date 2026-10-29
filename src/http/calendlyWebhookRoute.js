@@ -13,7 +13,7 @@ const EXPECTED_SCOPE = "rental-staging";
 
 const EVENT_TYPE =
   "https://api.calendly.com/event_types/" +
-  "a46c8135-40e3-4090-8942-ae9d6517c7d5";
+  "dee239b2-15fd-44b2-a343-f41e9ce2488e";
 
 const HOST =
   "https://api.calendly.com/users/" +

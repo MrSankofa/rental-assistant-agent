@@ -19,3 +19,10 @@ describe("property listing integrity", () => {
     }
   });
 });
+
+test("Dearborn Heights scheduling uses the correct Calendly event", () => {
+  expect(properties.ziegler.showingUrl).toBe(
+    "https://calendly.com/altruistic-re/dearborn-heights-rental"
+  );
+  expect(properties.virginia.showingUrl).toBe("");
+});

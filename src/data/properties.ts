@@ -49,6 +49,6 @@ export const properties: Record<string, Property> = {
     applicationAvailableFrom: "2026-10-24",
 
     showingUrl:
-      "https://calendly.com/altruistic-re/ziegler-house-showing",
+      "https://calendly.com/altruistic-re/dearborn-heights-rental",
   },
 };

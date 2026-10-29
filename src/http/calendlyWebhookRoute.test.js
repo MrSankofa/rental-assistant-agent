@@ -19,7 +19,7 @@ const eventUri =
 const inviteeUri = eventUri + "/invitees/http-invitee";
 const eventTypeUri =
   "https://api.calendly.com/event_types/" +
-  "a46c8135-40e3-4090-8942-ae9d6517c7d5";
+  "dee239b2-15fd-44b2-a343-f41e9ce2488e";
 const hostUri =
   "https://api.calendly.com/users/" +
   "3cf40dec-d274-4901-84af-89910edd3640";
@@ -212,4 +212,46 @@ test("write switch schedules only the allowlisted staging prospect", async () =>
   expect(await crm.store.list("bookings")).toHaveLength(1);
   expect((await crm.history(lead.engagementId)).stage)
     .toBe("TOUR_SCHEDULED");
+});
+
+test("wrong property event type cannot schedule a tour", async () => {
+  const { crm, lead, body, fetchProviderResources } = await fixture();
+
+  fetchProviderResources.mockResolvedValueOnce({
+    scheduledEvent: {
+      uri: eventUri,
+      event_type:
+        "https://api.calendly.com/event_types/a46c8135-40e3-4090-8942-ae9d6517c7d5",
+      event_memberships: [{ user: hostUri }],
+      status: "active",
+      start_time: "2026-11-02T18:00:00Z",
+      end_time: "2026-11-02T18:30:00Z"
+    },
+    invitee: {
+      uri: inviteeUri,
+      event: eventUri,
+      email: "http-fixture@example.test",
+      status: "active"
+    }
+  });
+
+  const allowed = crypto.createHash("sha256")
+    .update("http-fixture@example.test").digest("hex");
+
+  const result = await handleCalendlyWebhook({
+    req: request(body),
+    crm,
+    env: {
+      ...env,
+      CALENDLY_CRM_WRITES_ENABLED: "true",
+      CALENDLY_CRM_WRITE_EMAIL_SHA256: allowed
+    }
+  });
+
+  expect(result.statusCode).toBe(202);
+  expect(result.body.crmUpdated).toBe(false);
+  expect(result.body.status).toBe("requires-review");
+  expect(await crm.store.list("bookings")).toHaveLength(0);
+  expect((await crm.history(lead.engagementId)).stage)
+    .toBe("TOUR_OFFERED");
 });

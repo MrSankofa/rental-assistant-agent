@@ -22,7 +22,7 @@ const staging={
   PUBLIC_ORIGIN:origin
 };
 const email="fictional-phase7a@example.test";
-const showingUrl="https://calendly.com/altruistic-re/ziegler-house-showing";
+const showingUrl="https://calendly.com/altruistic-re/dearborn-heights-rental";
 const eventUri="https://api.calendly.com/scheduled_events/phase7a-event";
 const inviteeUri=eventUri+"/invitees/phase7a-invitee";
 const eventTypeUri="https://api.calendly.com/event_types/ziegler-fixture";

@@ -34,6 +34,6 @@ exports.properties = {
         leaseTerm: "12 months",
         applicationUrl: "https://www.zillow.com/homedetails/4932-Ziegler-St-Dearborn-Heights-MI-48125/88094499_zpid/?view=public",
         applicationAvailableFrom: "2026-10-24",
-        showingUrl: "https://calendly.com/altruistic-re/ziegler-house-showing",
+        showingUrl: "https://calendly.com/altruistic-re/dearborn-heights-rental",
     },
 };
