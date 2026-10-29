@@ -51,6 +51,7 @@ async function dispatchCalendlyWebhook({
   loadCrmCandidates,
   writesEnabled = false,
   allowedEmailHash = "",
+  matchedWritesEnabled = false,
   now = Date.now()
 }) {
   if (!crm?.store ||
@@ -160,6 +161,7 @@ async function dispatchCalendlyWebhook({
     }
 
     if (writesEnabled &&
+        matchedWritesEnabled !== true &&
         !allowedTestEmail(inspected.booking.email, allowedEmailHash)) {
       return review("prospect-not-allowlisted");
     }
@@ -170,6 +172,11 @@ async function dispatchCalendlyWebhook({
         type: "created",
         crmUpdated: false
       };
+    }
+
+    if (matchedWritesEnabled === true &&
+        inspected.verifiedTourPurpose !== true) {
+      return review("appointment-purpose-not-tour");
     }
 
     const result = await processBooking(crm, inspected.booking);
@@ -254,6 +261,7 @@ async function dispatchCalendlyWebhook({
   }
 
   if (writesEnabled &&
+      matchedWritesEnabled !== true &&
       !allowedTestEmail(email, allowedEmailHash)) {
     return review("prospect-not-allowlisted");
   }

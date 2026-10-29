@@ -83,8 +83,24 @@ async function inspectCalendlyWebhook({
     expectedEventTypeUri
   });
 
+  // Derived exclusively from the Calendly API response, not the
+  // webhook request payload or prospect-supplied CRM fields.
+  const answers = provider.invitee.questions_and_answers;
+  const purposes = Array.isArray(answers)
+    ? answers.filter(item =>
+        typeof item?.question === "string" &&
+        item.question.trim().toLowerCase() === "appointment purpose"
+      )
+    : [];
+
+  const verifiedTourPurpose =
+    purposes.length === 1 &&
+    typeof purposes[0].answer === "string" &&
+    purposes[0].answer.trim().toLowerCase() === "property tour";
+
   return {
     ...result,
+    verifiedTourPurpose,
     dryRun: true,
     bookingPersisted: false,
     crmUpdated: false

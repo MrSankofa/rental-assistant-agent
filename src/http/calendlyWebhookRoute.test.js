@@ -255,3 +255,142 @@ test("wrong property event type cannot schedule a tour", async () => {
   expect((await crm.history(lead.engagementId)).stage)
     .toBe("TOUR_OFFERED");
 });
+
+test("matched mode schedules a verified existing tour prospect", async () => {
+  const { crm, lead, body, fetchProviderResources } = await fixture();
+
+  const provider = await fetchProviderResources();
+  fetchProviderResources.mockResolvedValue({
+    ...provider,
+    invitee: {
+      ...provider.invitee,
+      questions_and_answers: [
+        {
+          question: "Appointment purpose",
+          answer: "Property tour",
+          position: 0
+        }
+      ]
+    }
+  });
+
+  const result = await handleCalendlyWebhook({
+    req: request(body),
+    crm,
+    env: {
+      ...env,
+      CALENDLY_CRM_WRITES_ENABLED: "true",
+      CALENDLY_CRM_MATCHED_WRITES_ENABLED: "true"
+    }
+  });
+
+  expect(result.statusCode).toBe(202);
+  expect(result.body.status).toBe("scheduled");
+  expect(result.body.crmUpdated).toBe(true);
+  // One trusted Calendly API fetch per new booking.
+  // The fixture itself performs one setup fetch.
+  expect(fetchProviderResources).toHaveBeenCalledTimes(2);
+  expect((await crm.history(lead.engagementId)).stage)
+    .toBe("TOUR_SCHEDULED");
+});
+
+test("matched mode stays disabled without master write switch", async () => {
+  const { crm, lead, body } = await fixture();
+
+  const result = await handleCalendlyWebhook({
+    req: request(body),
+    crm,
+    env: {
+      ...env,
+      CALENDLY_CRM_WRITES_ENABLED: "false",
+      CALENDLY_CRM_MATCHED_WRITES_ENABLED: "true"
+    }
+  });
+
+  expect(result.body.status).toBe("verified-dry-run");
+  expect(result.body.crmUpdated).toBe(false);
+  expect((await crm.history(lead.engagementId)).stage)
+    .toBe("TOUR_OFFERED");
+});
+
+test("matched mode rejects unmatched invitee email", async () => {
+  const { crm, lead, body, fetchProviderResources } = await fixture();
+
+  const provider = await fetchProviderResources();
+  fetchProviderResources.mockResolvedValue({
+    ...provider,
+    invitee: {
+      ...provider.invitee,
+      email: "unmatched@example.test"
+    }
+  });
+
+  const result = await handleCalendlyWebhook({
+    req: request(body),
+    crm,
+    env: {
+      ...env,
+      CALENDLY_CRM_WRITES_ENABLED: "true",
+      CALENDLY_CRM_MATCHED_WRITES_ENABLED: "true"
+    }
+  });
+
+  expect(result.body.crmUpdated).toBe(false);
+  expect((await crm.history(lead.engagementId)).stage)
+    .toBe("TOUR_OFFERED");
+});
+
+test.each([
+  ["lease signing", "Lease signing"],
+  ["unrecognized purpose", "Other"],
+  ["blank purpose", ""]
+])("matched mode rejects %s", async (_label, answer) => {
+  const { crm, lead, body, fetchProviderResources } = await fixture();
+  const provider = await fetchProviderResources();
+
+  fetchProviderResources.mockResolvedValue({
+    ...provider,
+    invitee: {
+      ...provider.invitee,
+      questions_and_answers: [
+        { question: "Appointment purpose", answer, position: 0 }
+      ]
+    }
+  });
+
+  const result = await handleCalendlyWebhook({
+    req: request(body),
+    crm,
+    env: {
+      ...env,
+      CALENDLY_CRM_WRITES_ENABLED: "true",
+      CALENDLY_CRM_MATCHED_WRITES_ENABLED: "true"
+    }
+  });
+
+  expect(result.body.status).toBe("requires-review");
+  expect(result.body.crmUpdated).toBe(false);
+  expect(await crm.store.list("bookings")).toHaveLength(0);
+  expect((await crm.history(lead.engagementId)).stage)
+    .toBe("TOUR_OFFERED");
+});
+
+test("matched mode rejects missing appointment purpose", async () => {
+  const { crm, lead, body } = await fixture();
+
+  const result = await handleCalendlyWebhook({
+    req: request(body),
+    crm,
+    env: {
+      ...env,
+      CALENDLY_CRM_WRITES_ENABLED: "true",
+      CALENDLY_CRM_MATCHED_WRITES_ENABLED: "true"
+    }
+  });
+
+  expect(result.body.status).toBe("requires-review");
+  expect(result.body.crmUpdated).toBe(false);
+  expect(await crm.store.list("bookings")).toHaveLength(0);
+  expect((await crm.history(lead.engagementId)).stage)
+    .toBe("TOUR_OFFERED");
+});

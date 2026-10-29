@@ -73,8 +73,14 @@ async function handleCalendlyWebhook({ req, crm, env = process.env }) {
       env.CALENDLY_CRM_WRITE_EMAIL_SHA256 || "";
 
     // Fail closed: no writes without a valid test-email allowlist.
+    const matchedWritesEnabled =
+      env.CALENDLY_CRM_MATCHED_WRITES_ENABLED === "true";
+
+    // Both switches must be enabled for general matched-prospect writes.
+    // The original single-email allowlist remains the safer test mode.
     const writesEnabled = writeSwitchEnabled &&
-      /^[a-f0-9]{64}$/.test(allowedEmailHash);
+      (matchedWritesEnabled ||
+       /^[a-f0-9]{64}$/.test(allowedEmailHash));
 
     const result = await dispatchCalendlyWebhook({
       crm,
@@ -88,7 +94,8 @@ async function handleCalendlyWebhook({ req, crm, env = process.env }) {
 
       // Only the explicitly allowlisted staging prospect can be changed.
       writesEnabled,
-      allowedEmailHash
+      allowedEmailHash,
+      matchedWritesEnabled: writeSwitchEnabled && matchedWritesEnabled
     });
 
     return {
