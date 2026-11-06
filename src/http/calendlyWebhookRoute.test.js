@@ -394,3 +394,73 @@ test("matched mode rejects missing appointment purpose", async () => {
   expect((await crm.history(lead.engagementId)).stage)
     .toBe("TOUR_OFFERED");
 });
+
+test("production webhook accepts exact live configuration", async () => {
+  const crm = new CRM(new MemoryStore(), "rental-live");
+  const result = await handleCalendlyWebhook({
+    req: request({}),
+    crm,
+    env: {
+      ...env,
+      K_SERVICE: "rental-calendly-webhook-live",
+      CRM_DATABASE: "rental-leads-prod",
+      CRM_SCOPE: "rental-live"
+    }
+  });
+  expect(result.statusCode).not.toBe(404);
+});
+
+test.each([
+  ["wrong database", "rental-email-staging", "rental-live"],
+  ["wrong scope", "rental-leads-prod", "rental-staging"]
+])("production rejects %s", async (_name, database, scope) => {
+  const crm = new CRM(new MemoryStore(), scope);
+  const result = await handleCalendlyWebhook({
+    req: request({}),
+    crm,
+    env: {
+      ...env,
+      K_SERVICE: "rental-calendly-webhook-live",
+      CRM_DATABASE: database,
+      CRM_SCOPE: scope
+    }
+  });
+  expect(result.statusCode).toBe(404);
+});
+
+test("unknown deployment cannot enable webhook", async () => {
+  const crm = new CRM(new MemoryStore(), "rental-live");
+  const result = await handleCalendlyWebhook({
+    req: request({}),
+    crm,
+    env: {
+      ...env,
+      K_SERVICE: "unrecognized-service",
+      CRM_DATABASE: "rental-leads-prod",
+      CRM_SCOPE: "rental-live"
+    }
+  });
+  expect(result.statusCode).toBe(404);
+});
+
+test("production allowlist alone never authorizes writes", async () => {
+  const crm = new CRM(new MemoryStore(), "rental-live");
+  const { body } = await fixture();
+
+  const result = await handleCalendlyWebhook({
+    req: request(body),
+    crm,
+    env: {
+      ...env,
+      K_SERVICE: "rental-calendly-webhook-live",
+      CRM_DATABASE: "rental-leads-prod",
+      CRM_SCOPE: "rental-live",
+      CALENDLY_CRM_WRITES_ENABLED: "true",
+      CALENDLY_CRM_MATCHED_WRITES_ENABLED: "false",
+      CALENDLY_CRM_WRITE_EMAIL_SHA256: "a".repeat(64)
+    }
+  });
+  expect(result.statusCode).toBe(202);
+  expect(result.body.crmUpdated).toBe(false);
+  expect(await crm.store.list("bookings")).toHaveLength(0);
+});

@@ -5,6 +5,59 @@ const {realIntakeEnabled, validateRealRentalIntake} = require("./realIntake");
 const {turnstileConfigured,verifyRealInquiry} = require("../http/turnstile");
 const {offerStagingShowing}=require("./stagingShowingHandoff");
 
+const crypto = require("crypto");
+
+// Called only after the real inquiry has passed validation,
+// Turnstile verification, and durable CRM intake.
+async function offerRealTour(crm, validated) {
+  if (validated.interest !== "Tour inquiry" ||
+      validated.targetId !== "ziegler" ||
+      !validated.email ||
+      crm.scope !== "rental-live") return;
+
+  const hash = value => crypto.createHash("sha256")
+    .update(value).digest("hex").slice(0, 40);
+
+  const contactId = "c_" + hash(
+    crm.scope + "|" + validated.email
+  );
+  const engagementId = "e_" + hash(
+    contactId + "|rental|ziegler"
+  );
+
+  const contact = await crm.store.get("contacts", contactId);
+  const engagement = await crm.store.get(
+    "engagements", engagementId
+  );
+
+  if (!contact || !engagement ||
+      contact.value.email !== validated.email ||
+      engagement.value.contactId !== contactId ||
+      engagement.value.domain !== "rental" ||
+      engagement.value.targetId !== "ziegler") {
+    throw Object.assign(
+      new Error("Tour handoff requires staff review"),
+      {status: 503}
+    );
+  }
+
+  // Never rewind an existing booking or later lifecycle stage.
+  if (engagement.value.stage !== "CONTACT_CAPTURED") return;
+
+  try {
+    await crm.transition(
+      engagementId,
+      {stage: "TOUR_OFFERED"},
+      "verified-intake"
+    );
+  } catch (error) {
+    const current = await crm.history(engagementId);
+    if (!["TOUR_OFFERED", "TOUR_SCHEDULED"].includes(
+      current.stage
+    )) throw error;
+  }
+}
+
 const httpError=(status,message)=>Object.assign(new Error(message),{status});
 
 function intakeStatus(env, crmConfigured) {
@@ -40,7 +93,12 @@ async function acceptPublicInquiry({env, crm, headers, body, lookupProperty, ver
     : validateRealRentalIntake(body,lookupProperty);
   if (status.realIntakeEnabled) await verify({env,token:body.turnstileToken});
   const receipt=await crm.intake(validated,{origin:"public",actor:"prospect"});
-  if(!status.stagingTestMode) return receipt;
+  if(!status.stagingTestMode) {
+    if(status.realIntakeEnabled) {
+      await offerRealTour(crm,validated);
+    }
+    return receipt;
+  }
   // Only fictional private staging offers a tour automatically. Never expose CRM IDs.
   // Intake is already durable: a failed handoff must remain a staff-reviewed inquiry.
   try {
@@ -51,4 +109,4 @@ async function acceptPublicInquiry({env, crm, headers, body, lookupProperty, ver
   }
 }
 
-module.exports={intakeStatus,requireIntakeRequest,acceptPublicInquiry};
+module.exports={intakeStatus,requireIntakeRequest,acceptPublicInquiry,offerRealTour};

@@ -7,9 +7,25 @@ const { makeCalendlyApi } =
 const { makeCalendlyCandidateLookup } =
   require("../crm/calendlyCandidates");
 
-const EXPECTED_DATABASE = "rental-email-staging";
 const EXPECTED_PROJECT = "altruistic-platform";
-const EXPECTED_SCOPE = "rental-staging";
+
+const DEPLOYMENTS = Object.freeze({
+  "rental-calendly-webhook-staging": {
+    database: "rental-email-staging",
+    scope: "rental-staging"
+  },
+  "rental-calendly-webhook-live": {
+    database: "rental-leads-prod",
+    scope: "rental-live"
+  }
+});
+
+function deployment(env) {
+  // Legacy unit-test fixtures have no K_SERVICE.
+  const service = env.K_SERVICE ||
+    "rental-calendly-webhook-staging";
+  return DEPLOYMENTS[service] || null;
+}
 
 const EVENT_TYPE =
   "https://api.calendly.com/event_types/" +
@@ -20,13 +36,17 @@ const HOST =
   "3cf40dec-d274-4901-84af-89910edd3640";
 
 function enabled(env, crm) {
+  const target = deployment(env);
+
   return Boolean(
     crm &&
+    target &&
+    crm.scope === target.scope &&
     env.CALENDLY_WEBHOOK_ENABLED === "true" &&
     env.CRM_BACKEND === "firestore" &&
     env.GOOGLE_CLOUD_PROJECT === EXPECTED_PROJECT &&
-    env.CRM_DATABASE === EXPECTED_DATABASE &&
-    env.CRM_SCOPE === EXPECTED_SCOPE &&
+    env.CRM_DATABASE === target.database &&
+    env.CRM_SCOPE === target.scope &&
     env.CALENDLY_API_TOKEN?.length >= 16 &&
     env.CALENDLY_WEBHOOK_SIGNING_KEY?.length >= 16 &&
     !env.FIRESTORE_EMULATOR_HOST
@@ -78,9 +98,15 @@ async function handleCalendlyWebhook({ req, crm, env = process.env }) {
 
     // Both switches must be enabled for general matched-prospect writes.
     // The original single-email allowlist remains the safer test mode.
+    const isProduction =
+      env.K_SERVICE === "rental-calendly-webhook-live";
+
+    // Production requires both switches and verified CRM matching.
+    // Test-email allowlisting is never sufficient in production.
     const writesEnabled = writeSwitchEnabled &&
       (matchedWritesEnabled ||
-       /^[a-f0-9]{64}$/.test(allowedEmailHash));
+       (!isProduction &&
+        /^[a-f0-9]{64}$/.test(allowedEmailHash)));
 
     const result = await dispatchCalendlyWebhook({
       crm,

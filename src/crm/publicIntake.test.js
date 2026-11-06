@@ -57,7 +57,7 @@ describe("public intake route orchestration without external I/O",()=>{
   expect(second).toEqual(first);
   expect(await crm.listContacts()).toHaveLength(1);
   expect(await crm.listEngagements()).toHaveLength(1);
-  expect((await crm.listEngagements())[0].stage).toBe("CONTACT_CAPTURED");
+  expect((await crm.listEngagements())[0].stage).toBe("TOUR_OFFERED");
   expect(verify).toHaveBeenCalledTimes(2);
  });
  test("does not persist invalid fields or accept real people in staging",async()=>{
