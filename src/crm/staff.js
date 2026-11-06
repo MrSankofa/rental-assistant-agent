@@ -39,7 +39,7 @@ function legacyAdminEnabled(env) {
     env.CRM_REAL_INTAKE_ENABLED !== "true";
 }
 
-function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disabled", workspace="staging"}={}) {
+function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disabled", workspace="staging",actionsEnabled=false}={}) {
   const byId = new Map(contacts.map(c => [c.id, c]));
   const pipeline = engagements.map(e => {
     const contact = byId.get(e.contactId);
@@ -54,6 +54,7 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
   const unreviewed = pipeline.filter(e => e.stage === "CONTACT_CAPTURED");
   return {
     workspace,
+    actionsEnabled:workspace==="live" && actionsEnabled===true,
     deliveryMode:workspace === "live" ? "disabled" : deliveryMode,
     attention: {
       newInquiryCount:unreviewed.length,

@@ -136,6 +136,72 @@ async function reload(){
    cell(tr,e.nextAction);
    const controls=document.createElement("td");
    const next=e.stage==="CONTACT_CAPTURED"?"TOUR_OFFERED":e.stage==="TOUR_OFFERED"?"TOUR_SCHEDULED":"";
+   if(live && data.actionsEnabled===true){
+    const nextMilestone={
+      TOUR_SCHEDULED:"TOUR_COMPLETED",
+      TOUR_COMPLETED:"APPLICATION_INVITED",
+      APPLICATION_INVITED:"APPLICATION_RECEIVED",
+      APPLICATION_RECEIVED:"UNDER_LANDLORD_REVIEW"
+    }[e.stage];
+
+    if(nextMilestone){
+      const form=document.createElement("form");
+      form.className="staff-milestone-form";
+
+      const title=document.createElement("p");
+      title.textContent="Next milestone: "+nextMilestone.replaceAll("_"," ");
+
+      const evidence=document.createElement("textarea");
+      evidence.required=true;
+      evidence.minLength=10;
+      evidence.maxLength=300;
+      evidence.rows=3;
+      evidence.placeholder="Record verified evidence or staff attestation";
+      evidence.setAttribute("aria-label","Milestone evidence");
+
+      const confirmation=document.createElement("label");
+      const checkbox=document.createElement("input");
+      checkbox.type="checkbox";
+      checkbox.required=true;
+      confirmation.append(checkbox," I independently verified this milestone");
+
+      const submit=document.createElement("button");
+      submit.type="submit";
+      submit.textContent="Record milestone";
+
+      form.append(title,evidence,confirmation,submit);
+
+      form.addEventListener("submit",async event=>{
+        event.preventDefault();
+        if(!checkbox.checked || !evidence.checkValidity())return;
+        if(!confirm("Record this verified milestone in the live CRM?"))return;
+
+        submit.disabled=true;
+        try{
+          await json(
+            "/api/staff/engagements/"+
+              encodeURIComponent(e.id)+"/stage",
+            {
+              method:"POST",
+              headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({
+                stage:nextMilestone,
+                evidence:evidence.value,
+                confirmed:true
+              })
+            }
+          );
+          await reload();
+        }catch(error){
+          message(error.message);
+          submit.disabled=false;
+        }
+      });
+
+      controls.appendChild(form);
+    }
+   }
+
    if(next && !live){
     const action=document.createElement("button");
     action.textContent=next==="TOUR_OFFERED"?"Mark tour offered":"Confirm tour scheduled";
@@ -152,6 +218,13 @@ async function reload(){
     });
     controls.appendChild(action);
    }
+   if(live && data.actionsEnabled!==true){
+     const note=document.createElement("div");
+     note.className="muted";
+     note.textContent="Staff actions awaiting authorization setup";
+     controls.appendChild(note);
+   }
+
    const updated=document.createElement("div");
    updated.className="muted";
    updated.textContent="Updated: "+stamp(e.updatedAt);

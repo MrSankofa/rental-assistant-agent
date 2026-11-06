@@ -6,6 +6,7 @@ const { handleCalendlyWebhook } = require("./src/http/calendlyWebhookRoute");
 const { askAI } = require("./src/agent/openai");
 
 
+const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
 const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
 const { generateFollowupTasks } = require("./src/crm/followups");
@@ -162,12 +163,51 @@ const server = http.createServer(async (req, res) => {
       try {
         sendJson(res,200,summarizeDashboard(
           await crm.listContacts(), await crm.listEngagements(), await crm.listTasks(),
-          {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging"}));
+          {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging",actionsEnabled:liveStaffMode&&actionsEnabled(process.env)}));
       } catch(e) { sendJson(res,500,{error:"Unable to load staff dashboard"}); }
       return;
     }
-    // Live records are read-only until a separate authenticated staff workflow is approved.
-    if (liveStaffMode) { sendJson(res,403,{error:"Live staff actions not yet enabled"}); return; }
+    // Live actions remain disabled unless explicitly released on the private service.
+    if (liveStaffMode) {
+      const stagePath = pathname.match(
+        /^\\/api\\/staff\\/engagements\\/([a-zA-Z0-9_-]+)\\/stage$/
+      );
+      if (req.method !== "POST" || !stagePath ||
+          !actionsEnabled(process.env)) {
+        sendJson(res,403,{error:"Live staff actions disabled"});
+        return;
+      }
+
+      // Require an actual same-origin browser request. Cloud Run IAM
+      // remains the authentication perimeter, not a browser cookie.
+      const origin=req.headers.origin||"";
+      const host=req.headers.host||"";
+      if (!host.endsWith(".run.app") ||
+          !origin || origin !== "https://"+host) {
+        sendJson(res,403,{error:"Origin not allowed"});
+        return;
+      }
+
+      const body=await readJsonBody(req,res,4096);
+      if (!body) return;
+
+      try {
+        const current=await crm.history(stagePath[1]);
+        const milestone=validateMilestone(current,body);
+        const result=await crm.transition(
+          stagePath[1],milestone,"staff"
+        );
+        sendJson(res,200,{
+          id:result.id,stage:result.stage,
+          updatedAt:result.updatedAt
+        });
+      } catch(error) {
+        sendJson(res,error.status||500,{
+          error:error.status?error.message:"Staff update unavailable"
+        });
+      }
+      return;
+    }
     // Mutating actions require an explicit same-origin request and no proxy-based bearer bypass.
     // Cloud Run IAM is the authentication perimeter of this private staff service.
     if (req.method === "POST" && !requireStagingOrigin(req.headers.origin,allowedOrigin)) {
