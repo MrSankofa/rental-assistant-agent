@@ -1,4 +1,5 @@
 "use strict";
+const { summarizePipeline } = require("./staffInsights");
 
 // Cloud Run IAM is the authentication boundary for both dedicated staff services.
 // Never enable staff endpoints on a public prospect-facing service.
@@ -61,6 +62,7 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
       ) || null
     },
     pipeline,
+    overview:summarizePipeline(pipeline),
     tasks:tasks.map(t => ({
       id:t.id,engagementId:t.engagementId,status:t.status,
       summary:t.summary,dueAt:t.dueAt,draft:t.draft||"",
