@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { requestPath } = require("./src/http/requestPath");
+const { verifyIapIdentity } = require("./src/http/iapIdentity");
 const { handleCalendlyWebhook } = require("./src/http/calendlyWebhookRoute");
 const { askAI } = require("./src/agent/openai");
 
@@ -188,6 +189,17 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      let verifiedStaff;
+      try {
+        verifiedStaff=await verifyIapIdentity(
+          req.headers["x-goog-iap-jwt-assertion"],
+          {allowedEmails:process.env.CRM_STAFF_ALLOWED_EMAILS}
+        );
+      } catch {
+        sendJson(res,403,{error:"Verified staff identity required"});
+        return;
+      }
+
       const body=await readJsonBody(req,res,4096);
       if (!body) return;
 
@@ -195,7 +207,7 @@ const server = http.createServer(async (req, res) => {
         const current=await crm.history(stagePath[1]);
         const milestone=validateMilestone(current,body);
         const result=await crm.transition(
-          stagePath[1],milestone,"staff"
+          stagePath[1],milestone,verifiedStaff.actor
         );
         sendJson(res,200,{
           id:result.id,stage:result.stage,

@@ -198,7 +198,11 @@ class CRM {
    const e=row.value;
    const transitions=e.domain==="rental"?NEXT_RENTAL:NEXT_COMMUNITY;
    if(!(transitions[e.stage] || []).includes(target)) throw Object.assign(new Error("Invalid stage transition"),{status:409});
-   if(STAFF_REQUIRED.has(target)&&actor!=="staff" || APPROVAL_STAGES.has(target)&&input.confirmed!==true)
+   if(STAFF_REQUIRED.has(target)&&
+      !(actor==="staff" ||
+        (typeof actor==="string" &&
+         /^staff:accounts\.google\.com:[0-9]{6,30}$/.test(actor))) ||
+      APPROVAL_STAGES.has(target)&&input.confirmed!==true)
      throw Object.assign(new Error("Staff confirmation required"),{status:403});
    // External milestones must include an evidence reference or recorded staff attestation.
    if(STAFF_REQUIRED.has(target)&&!safeText(input.evidence,300))
