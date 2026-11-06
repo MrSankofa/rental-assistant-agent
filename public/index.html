@@ -402,13 +402,9 @@
         nextSection.hidden = true;
         nextLink.removeAttribute("href");
         try {
-          // Staging: only show a link that was offered AND recorded by intake.
-          // Preserve the earlier read-only link path for separate live-intake work.
-          let steps = result.nextSteps || null;
-          if (!steps && isLiveIntake) {
-            const nextResponse = await fetch("/api/crm/staging-next-steps", {cache:"no-store"});
-            if (nextResponse.ok) steps = await nextResponse.json();
-          }
+          // Show only the trusted link returned after recorded intake.
+          // Calendly, not this page, confirms a booking.
+          const steps = result.nextSteps || null;
           if (steps && steps.showingAvailable && steps.propertyId === "ziegler" &&
               steps.bookingRecorded === false && typeof steps.showingUrl === "string") {
             const verified = new URL(steps.showingUrl);

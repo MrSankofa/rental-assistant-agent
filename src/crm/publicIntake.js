@@ -4,6 +4,7 @@ const {stagingIntakeEnabled, validateFictionalIntake} = require("./stagingIntake
 const {realIntakeEnabled, validateRealRentalIntake} = require("./realIntake");
 const {turnstileConfigured,verifyRealInquiry} = require("../http/turnstile");
 const {offerStagingShowing}=require("./stagingShowingHandoff");
+const {safeCalendlyLink}=require("./prospectJourney");
 
 const crypto = require("crypto");
 
@@ -13,7 +14,7 @@ async function offerRealTour(crm, validated) {
   if (validated.interest !== "Tour inquiry" ||
       validated.targetId !== "ziegler" ||
       !validated.email ||
-      crm.scope !== "rental-live") return;
+      crm.scope !== "rental-live") return false;
 
   const hash = value => crypto.createHash("sha256")
     .update(value).digest("hex").slice(0, 40);
@@ -42,7 +43,9 @@ async function offerRealTour(crm, validated) {
   }
 
   // Never rewind an existing booking or later lifecycle stage.
-  if (engagement.value.stage !== "CONTACT_CAPTURED") return;
+  if (engagement.value.stage !== "CONTACT_CAPTURED") {
+    return engagement.value.stage === "TOUR_OFFERED";
+  }
 
   try {
     await crm.transition(
@@ -56,6 +59,9 @@ async function offerRealTour(crm, validated) {
       current.stage
     )) throw error;
   }
+
+  const current = await crm.history(engagementId);
+  return current.stage === "TOUR_OFFERED";
 }
 
 const httpError=(status,message)=>Object.assign(new Error(message),{status});
@@ -95,7 +101,26 @@ async function acceptPublicInquiry({env, crm, headers, body, lookupProperty, ver
   const receipt=await crm.intake(validated,{origin:"public",actor:"prospect"});
   if(!status.stagingTestMode) {
     if(status.realIntakeEnabled) {
-      await offerRealTour(crm,validated);
+      const tourOffered = await offerRealTour(crm,validated);
+
+      if(tourOffered) {
+        const result = lookupProperty("ziegler");
+        const property = result?.found === true
+          ? result.property : null;
+        const showingUrl = safeCalendlyLink(property);
+
+        if(showingUrl) {
+          return {
+            ...receipt,
+            nextSteps: {
+              propertyId: "ziegler",
+              showingAvailable: true,
+              showingUrl,
+              bookingRecorded: false
+            }
+          };
+        }
+      }
     }
     return receipt;
   }
