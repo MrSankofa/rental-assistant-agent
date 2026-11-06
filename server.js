@@ -170,7 +170,7 @@ const server = http.createServer(async (req, res) => {
     // Live actions remain disabled unless explicitly released on the private service.
     if (liveStaffMode) {
       const stagePath = pathname.match(
-        /^\\/api\\/staff\\/engagements\\/([a-zA-Z0-9_-]+)\\/stage$/
+        /^\/api\/staff\/engagements\/([a-zA-Z0-9_-]+)\/stage$/
       );
       if (req.method !== "POST" || !stagePath ||
           !actionsEnabled(process.env)) {
