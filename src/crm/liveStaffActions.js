@@ -1,4 +1,6 @@
 "use strict";
+const {validateApplicationStep} =
+  require("./applicationTracking");
 
 const NEXT = Object.freeze({
   TOUR_SCHEDULED: "TOUR_COMPLETED",
@@ -69,7 +71,8 @@ function validateMilestone(current, input) {
   return {
     stage: expected,
     evidence: input.evidence.trim(),
-    nextAction: nextActions[expected]
+    nextAction: nextActions[expected],
+    application:validateApplicationStep(expected,input)
   };
 }
 

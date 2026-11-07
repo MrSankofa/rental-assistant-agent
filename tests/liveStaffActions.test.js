@@ -98,7 +98,10 @@ describe("Phase 8B staff action safety",()=>{
       const input=validateMilestone(current,{
         stage,
         confirmed:true,
-        evidence:"Staff independently verified milestone"
+        evidence:"Staff independently verified milestone",
+        applicationUrl:"https://applications.example.com/apply",
+        externalDeliveryConfirmed:true,
+        submissionReference:"PROVIDER-TEST-123456"
       });
 
       await crm.transition(intake.engagementId,input,"staff");

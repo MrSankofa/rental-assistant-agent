@@ -46,6 +46,7 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
     return {
       id:e.id, property:e.targetId, interest:e.interest||"", stage:e.stage,
       nextAction:e.nextAction||"", updatedAt:e.updatedAt, createdAt:e.createdAt,
+      application:e.application||null,
       contact:contact ? {name:contact.name,email:contact.email,phone:contact.phone,
         consent:contact.consent,preferredChannel:contact.preferredChannel} : null
     };

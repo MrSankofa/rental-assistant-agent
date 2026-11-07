@@ -264,6 +264,45 @@ async function reload(){
       evidence.placeholder="Record verified evidence or staff attestation";
       evidence.setAttribute("aria-label","Milestone evidence");
 
+      let applicationUrl=null;
+      let deliveryConfirmation=null;
+      let submissionReference=null;
+
+      if(nextMilestone==="APPLICATION_INVITED"){
+        applicationUrl=document.createElement("input");
+        applicationUrl.type="url";
+        applicationUrl.required=true;
+        applicationUrl.maxLength=500;
+        applicationUrl.placeholder="https://provider.example/application";
+        applicationUrl.setAttribute(
+          "aria-label","External application URL"
+        );
+
+        const sentLabel=document.createElement("label");
+        deliveryConfirmation=document.createElement("input");
+        deliveryConfirmation.type="checkbox";
+        deliveryConfirmation.required=true;
+        sentLabel.append(
+          deliveryConfirmation,
+          "I sent the application invitation outside this CRM"
+        );
+
+        form.append(applicationUrl,sentLabel);
+      }
+
+      if(nextMilestone==="APPLICATION_RECEIVED"){
+        submissionReference=document.createElement("input");
+        submissionReference.type="text";
+        submissionReference.required=true;
+        submissionReference.minLength=8;
+        submissionReference.maxLength=100;
+        submissionReference.placeholder="External provider confirmation reference";
+        submissionReference.setAttribute(
+          "aria-label","Application submission reference"
+        );
+        form.appendChild(submissionReference);
+      }
+
       const confirmation=document.createElement("label");
       const checkbox=document.createElement("input");
       checkbox.type="checkbox";
@@ -274,11 +313,14 @@ async function reload(){
       submit.type="submit";
       submit.textContent="Record milestone";
 
-      form.append(title,evidence,confirmation,submit);
+      form.prepend(title);
+      form.append(evidence,confirmation,submit);
 
       form.addEventListener("submit",async event=>{
         event.preventDefault();
-        if(!checkbox.checked || !evidence.checkValidity())return;
+        if(!form.reportValidity() || !checkbox.checked)return;
+        if(deliveryConfirmation &&
+           !deliveryConfirmation.checked)return;
         if(!confirm("Record this verified milestone in the live CRM?"))return;
 
         submit.disabled=true;
@@ -292,7 +334,14 @@ async function reload(){
               body:JSON.stringify({
                 stage:nextMilestone,
                 evidence:evidence.value,
-                confirmed:true
+                confirmed:true,
+                ...(applicationUrl ? {
+                  applicationUrl:applicationUrl.value,
+                  externalDeliveryConfirmed:deliveryConfirmation.checked
+                } : {}),
+                ...(submissionReference ? {
+                  submissionReference:submissionReference.value
+                } : {})
               })
             }
           );
@@ -328,6 +377,35 @@ async function reload(){
      note.className="muted";
      note.textContent="Staff actions awaiting authorization setup";
      controls.appendChild(note);
+   }
+
+   if(e.application){
+     const details=document.createElement("div");
+     details.className="muted";
+     details.style.marginTop="12px";
+
+     const a=e.application;
+     const records=[
+       "Application: "+(a.status||"unknown"),
+       a.invitedAt?"Invited: "+stamp(a.invitedAt):"",
+       a.receivedAt?"Received: "+stamp(a.receivedAt):"",
+       a.submissionReference?
+         "Provider reference: "+a.submissionReference:"",
+       a.underReviewAt?
+         "Landlord review: "+stamp(a.underReviewAt):""
+     ].filter(Boolean);
+
+     details.textContent=records.join(" | ");
+     controls.appendChild(details);
+
+     if(a.url){
+       const external=document.createElement("a");
+       external.href=a.url;
+       external.textContent="Open external application provider";
+       external.target="_blank";
+       external.rel="noopener noreferrer";
+       controls.appendChild(external);
+     }
    }
 
    const updated=document.createElement("div");

@@ -1,6 +1,8 @@
 "use strict";
 const crypto = require("crypto");
 const { StoreConflict } = require("./storage");
+const {recordApplication} =
+  require("./applicationTracking");
 
 const RENTAL_STAGES = ["INQUIRY_NEW","CONTACT_CAPTURED","TOUR_OFFERED","TOUR_SCHEDULED","TOUR_COMPLETED","APPLICATION_INVITED","APPLICATION_RECEIVED","UNDER_LANDLORD_REVIEW","APPROVED","DENIED","MORE_INFO_REQUESTED","RENTREDI_ONBOARDING","LEASE_SIGNING_SCHEDULED","DISCLOSURES_READY_AND_DELIVERED","LEASE_SIGNED","MOVE_IN_FUNDS_VERIFIED","KEYS_RELEASED","MOVE_IN_CHECKLIST_PENDING","MOVE_IN_COMPLETED","WITHDRAWN","TOUR_CANCELLED","NO_SHOW"];
 const COMMUNITY_STAGES = ["NEW","INTEREST_RECORDED","INVITED","RSVP_CONFIRMED","ATTENDED","THANKED","FOLLOW_UP","CLOSED","WITHDRAWN"];
@@ -209,6 +211,13 @@ class CRM {
      throw Object.assign(new Error("Evidence required"),{status:400});
    const now=new Date().toISOString();
    e.history.push({at:now,actor,from:e.stage,stage:target,evidence:input.evidence||""});
+   if(this.scope==="rental-live" &&
+      ["APPLICATION_INVITED","APPLICATION_RECEIVED",
+       "UNDER_LANDLORD_REVIEW"].includes(target)){
+     e.application=recordApplication(
+       e.application,target,input.application,now
+     );
+   }
    e.stage=target;e.updatedAt=now;e.nextAction=safeText(input.nextAction,200);
    e.nextActionOwner=e.nextAction?"staff":"";e.nextActionAt=e.nextAction?now:null;
    try{
