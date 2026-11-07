@@ -160,6 +160,30 @@ const server = http.createServer(async (req, res) => {
       fs.createReadStream(path.join(__dirname,"public","staff.html")).pipe(res);
       return;
     }
+    if (req.method === "GET" && pathname === "/api/staff/identity") {
+      if (!liveStaffMode) {
+        sendJson(res,404,{error:"Not found"});
+        return;
+      }
+
+      try {
+        const staff=await verifyIapIdentity(
+          req.headers["x-goog-iap-jwt-assertion"],
+          {allowedEmails:process.env.CRM_STAFF_ALLOWED_EMAILS}
+        );
+
+        sendJson(res,200,{
+          verified:true,
+          email:staff.email
+        });
+      } catch (_) {
+        sendJson(res,403,{
+          verified:false,
+          error:"Verified staff identity required"
+        });
+      }
+      return;
+    }
     if (req.method === "GET" && pathname === "/api/staff/dashboard") {
       try {
         sendJson(res,200,summarizeDashboard(
