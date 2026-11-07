@@ -93,6 +93,10 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
 </main><script>
 const q=id=>document.getElementById(id);
 const stamp=x=>x?new Date(x).toLocaleString():"";
+const propertyName=id=>({
+  ziegler:"Dearborn Heights",
+  virginia:"Detroit"
+})[id]||id;
 function cell(row,text){const td=document.createElement("td");td.textContent=String(text??"");row.appendChild(td);return td;}
 async function json(url,options){const r=await fetch(url,{cache:"no-store",...options});const d=await r.json();if(!r.ok)throw Error(d.error||"Request failed");return d;}
 function message(text){q("message").textContent=text;}
@@ -174,7 +178,7 @@ async function reload(){
    ].join("\\n");
    details.append(summary,content);
    contactCell.appendChild(details);
-   cell(tr,e.property);
+   cell(tr,propertyName(e.property));
    cell(tr,e.interest||"General inquiry");
    cell(tr,e.stage);
    cell(tr,e.nextAction);
@@ -304,8 +308,8 @@ async function reload(){
    editor.value=t.draft||"";
    editor.rows=4;editor.maxLength=1000;editor.style.width="100%";
    editor.style.minWidth="240px";
-   editor.disabled=t.status!=="pending-approval";
-   editor.setAttribute("aria-label","Follow-up email draft");
+   editor.disabled=live || t.status!=="pending-approval";
+   editor.setAttribute("aria-label","Task draft, not sent");
    draftCell.appendChild(editor);
    const origin=document.createElement("div");
    origin.className="muted";
@@ -420,7 +424,7 @@ async function reload(){
    tr.appendChild(td);tasks.appendChild(tr);
   }
   if(!filtered.length) pipeline.appendChild(Object.assign(document.createElement("tr"),{textContent:"No engagements"}));
-  if(!data.tasks.length) tasks.appendChild(Object.assign(document.createElement("tr"),{textContent:"No follow-up tasks yet"}));
+  if(!data.tasks.length) tasks.appendChild(Object.assign(document.createElement("tr"),{textContent:"No persistent staff tasks yet"}));
   message("Loaded "+data.pipeline.length+" engagements; showing "+filtered.length+" filtered records");
  }catch(e){message("Unable to load CRM: "+e.message);}
 }

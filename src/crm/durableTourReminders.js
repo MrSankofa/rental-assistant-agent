@@ -7,7 +7,11 @@ const { planTourReminders, POLICY_VERSION } =
 const HOUR = 3600000;
 
 // Deliberately unavailable for production CRM scopes.
-function requireStaging(crm) {
+function requireStaging(crm, {allowLive=false}={}) {
+  if (allowLive &&
+      crm?.scope === "rental-live" &&
+      crm.store?.databaseId === "rental-leads-prod") return;
+
   if (!crm || !["rental-staging","rental-p9b-test"].includes(crm.scope) || !crm.store)
     throw Error("Tour reminder writes require staging CRM");
   if (crm.store.databaseId !== undefined &&
@@ -49,8 +53,10 @@ async function cancelTask(crm, id, reason, now) {
   return false;
 }
 
-async function reconcileTourReminders(crm, {now=new Date()}={}) {
-  requireStaging(crm);
+async function reconcileTourReminders(
+  crm, {now=new Date(),allowLive=false}={}
+) {
+  requireStaging(crm,{allowLive});
 
   const clock = new Date(now).getTime();
   if (!Number.isFinite(clock)) throw Error("Invalid reminder clock");
