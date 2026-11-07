@@ -14,6 +14,8 @@ const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
 const { generateFollowupTasks } = require("./src/crm/followups");
 const { planTourReminders } = require("./src/crm/tourReminderPlanner");
+const { overlayReminderStatus } =
+  require("./src/crm/reminderPresentation");
 const { prepareDraft, editDraft, approveAndSend, deliveryMode } = require("./src/crm/messaging");
 const { staffEnabled, liveStaffEnabled, legacyAdminEnabled, summarizeDashboard } = require("./src/crm/staff");
 const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
@@ -198,8 +200,12 @@ const server = http.createServer(async (req, res) => {
         dashboard.reminderStaffActionsEnabled =
           liveStaffMode && reminderStaffEnabled(process.env);
         dashboard.reminders = liveStaffMode
-          ? planTourReminders(
-              engagements, await crm.store.list("bookings"), {now:new Date()}
+          ? overlayReminderStatus(
+              planTourReminders(
+                engagements, await crm.store.list("bookings"),
+                {now:new Date()}
+              ),
+              tasks
             )
           : [];
         sendJson(res,200,dashboard);

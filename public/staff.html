@@ -52,6 +52,60 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
 .staff-milestone-form button{
   align-self:flex-start;
 }
+
+.staff-task-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));
+  gap:16px;
+  margin-top:18px;
+}
+.staff-task-card{
+  padding:18px;
+  border:1px solid #d6dce4;
+  border-radius:10px;
+  background:#f8fafc;
+  min-width:0;
+}
+.staff-task-card h3{
+  margin:0 0 12px;
+  font-size:1rem;
+  line-height:1.4;
+}
+.staff-task-card p{margin:8px 0;overflow-wrap:anywhere}
+.staff-task-card form{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:12px;
+  margin-top:16px;
+}
+.staff-task-card textarea{
+  width:100%;
+  min-height:100px;
+  box-sizing:border-box;
+  padding:10px;
+  font:inherit;
+  border:1px solid #aab5c4;
+  border-radius:6px;
+}
+.staff-task-card label{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  line-height:1.4;
+}
+.staff-task-card .action-row{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.staff-task-card button{
+  flex:1 1 140px;
+}
+.staff-task-card button.secondary{
+  background:#4b5563;
+}
+[hidden]{display:none!important}
 </style></head>
 <body><main>
 <header><h1>Rental Assistant | Staff CRM</h1>
@@ -88,8 +142,9 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
 </table>
 </div>
 </section>
-<section><h2>Follow-up review queue</h2><p class="muted">Follow-up review and drafting workspace. Automatic email and SMS delivery are currently disabled.</p>
-<div class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
+<section><h2>Staff action queue</h2><p class="muted">Review tasks and recorded decisions. Email and SMS delivery remain disabled.</p>
+<div id="staffTaskCards" class="staff-task-grid"></div>
+<div id="legacyTaskTable" class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
 </main><script>
 const q=id=>document.getElementById(id);
 const stamp=x=>x?new Date(x).toLocaleString():"";
@@ -106,6 +161,8 @@ async function reload(){
   const data=await json("/api/staff/dashboard");
   const pipeline=q("pipeline"),tasks=q("tasks");pipeline.replaceChildren();tasks.replaceChildren();
   const live=data.workspace==="live";
+  q("staffTaskCards").replaceChildren();
+  q("legacyTaskTable").hidden=live;
   const overview=data.overview||{};
   const tiles=[
     ["Total prospects",overview.total||0],
@@ -300,7 +357,125 @@ async function reload(){
      reminderRows.appendChild(row);
    }
 
-   for(const t of data.tasks){
+   if(live){
+     const cards=q("staffTaskCards");
+
+     for(const t of data.tasks){
+       const card=document.createElement("article");
+       card.className="staff-task-card";
+
+       const title=document.createElement("h3");
+       title.textContent=t.summary||"Staff review task";
+
+       const due=document.createElement("p");
+       due.textContent="Due: "+stamp(t.dueAt);
+
+       const status=document.createElement("p");
+       status.textContent="Status: "+t.status;
+
+       const delivery=document.createElement("p");
+       delivery.className="muted";
+       delivery.textContent="Delivery: disabled";
+
+       card.append(title,due,status,delivery);
+
+       if(t.staffResolution){
+         const resolution=document.createElement("p");
+         resolution.className="muted";
+         resolution.textContent=
+           "Decision: "+t.staffResolution.action+
+           " | "+t.staffResolution.reason+
+           " | "+stamp(t.staffResolution.at);
+         card.appendChild(resolution);
+       }
+
+       if(data.reminderStaffActionsEnabled===true &&
+          t.source==="tour-reminder-planner" &&
+          t.status==="pending-approval"){
+
+         const form=document.createElement("form");
+         form.className="staff-reminder-decision";
+
+         const reason=document.createElement("textarea");
+         reason.required=true;
+         reason.minLength=10;
+         reason.maxLength=300;
+         reason.placeholder="Document your decision (10-300 characters)";
+         reason.setAttribute("aria-label","Reminder decision reason");
+
+         const label=document.createElement("label");
+         const checkbox=document.createElement("input");
+         checkbox.type="checkbox";
+         checkbox.required=true;
+         label.append(checkbox,"I reviewed this reminder");
+
+         const actions=document.createElement("div");
+         actions.className="action-row";
+
+         const complete=document.createElement("button");
+         complete.type="button";
+         complete.textContent="Complete review";
+
+         const dismiss=document.createElement("button");
+         dismiss.type="button";
+         dismiss.className="secondary";
+         dismiss.textContent="Dismiss reminder";
+
+         async function decide(action){
+           if(!reason.reportValidity())return;
+           if(!checkbox.checked){
+             message("Confirm that you reviewed this reminder");
+             return;
+           }
+
+           if(!confirm("Record this "+action+" decision in the live CRM?"))
+             return;
+
+           complete.disabled=true;
+           dismiss.disabled=true;
+
+           try{
+             await json(
+               "/api/staff/reminders/"+
+               encodeURIComponent(t.id)+"/decision",
+               {
+                 method:"POST",
+                 headers:{"Content-Type":"application/json"},
+                 body:JSON.stringify({
+                   action,
+                   reason:reason.value,
+                   confirmed:true
+                 })
+               }
+             );
+             await reload();
+           }catch(error){
+             message(error.message);
+             complete.disabled=false;
+             dismiss.disabled=false;
+           }
+         }
+
+         complete.addEventListener("click",()=>decide("complete"));
+         dismiss.addEventListener("click",()=>decide("dismiss"));
+
+         actions.append(complete,dismiss);
+         form.append(reason,label,actions);
+         card.appendChild(form);
+       }
+
+       cards.appendChild(card);
+     }
+
+     if(!data.tasks.length){
+       const empty=document.createElement("p");
+       empty.className="muted";
+       empty.textContent="No persistent staff tasks yet";
+       cards.appendChild(empty);
+     }
+   }
+
+   for(const t of (live?[]:data.tasks)){
    const tr=document.createElement("tr");
    cell(tr,t.summary);cell(tr,stamp(t.dueAt));cell(tr,t.status);
    const draftCell=document.createElement("td");
