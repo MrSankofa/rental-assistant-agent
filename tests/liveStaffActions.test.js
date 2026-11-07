@@ -47,7 +47,12 @@ describe("Phase 8B staff action safety",()=>{
       TOUR_SCHEDULED:"TOUR_COMPLETED",
       TOUR_COMPLETED:"APPLICATION_INVITED",
       APPLICATION_INVITED:"APPLICATION_RECEIVED",
-      APPLICATION_RECEIVED:"UNDER_LANDLORD_REVIEW"
+      APPLICATION_RECEIVED:"UNDER_LANDLORD_REVIEW",
+      MORE_INFO_REQUESTED:"UNDER_LANDLORD_REVIEW",
+      APPROVED:"RENTREDI_ONBOARDING",
+      RENTREDI_ONBOARDING:"LEASE_SIGNING_SCHEDULED",
+      LEASE_SIGNING_SCHEDULED:"DISCLOSURES_READY_AND_DELIVERED",
+      DISCLOSURES_READY_AND_DELIVERED:"LEASE_SIGNED"
     });
 
     expect(()=>validateMilestone(
@@ -93,7 +98,14 @@ describe("Phase 8B staff action safety",()=>{
       stage:"TOUR_SCHEDULED"
     });
 
-    for(const stage of Object.values(NEXT)){
+    // Phase 8 audit regression checks the original four stages.
+    // Phase 11 leasing paths have their own complete audit tests.
+    for(const stage of [
+      "TOUR_COMPLETED",
+      "APPLICATION_INVITED",
+      "APPLICATION_RECEIVED",
+      "UNDER_LANDLORD_REVIEW"
+    ]){
       const current=await crm.history(intake.engagementId);
       const input=validateMilestone(current,{
         stage,

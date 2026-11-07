@@ -106,6 +106,40 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
   background:#4b5563;
 }
 [hidden]{display:none!important}
+
+.staff-prospect-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,450px),1fr));
+  gap:16px;
+  margin-top:16px;
+}
+.staff-prospect-card{
+  padding:18px;
+  border:1px solid #d6dce4;
+  background:#f8fafc;
+  border-radius:10px;
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+.staff-prospect-card h3{margin:0 0 12px}
+.staff-prospect-card p{margin:8px 0}
+.staff-prospect-card .staff-milestone-form{
+  min-width:0;
+  max-width:none;
+  margin-top:16px;
+}
+.staff-prospect-card input:not([type="checkbox"]),
+.staff-prospect-card select{
+  width:100%;
+  box-sizing:border-box;
+  min-width:0;
+}
+.staff-prospect-card textarea{max-width:100%}
+@media(max-width:700px){
+  body{padding:12px}
+  section{padding:14px}
+  .staff-prospect-card{padding:14px}
+}
 </style></head>
 <body><main>
 <header><h1>Rental Assistant | Staff CRM</h1>
@@ -131,7 +165,9 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
 <option value="">All stages</option>
 </select></label>
 </div>
-<p class="muted" id="filterSummary"></p><div class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Request</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
+<p class="muted" id="filterSummary"></p>
+<div id="prospectCards" class="staff-prospect-grid"></div>
+<div id="legacyPipelineTable" class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Request</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
 <section>
 <h2>Tour reminders and outcome reviews</h2>
 <p class="muted">Read-only scheduling preview from verified Calendly bookings. No reminders are sent and no tasks are written by this preview.</p>
@@ -161,6 +197,8 @@ async function reload(){
   const data=await json("/api/staff/dashboard");
   const pipeline=q("pipeline"),tasks=q("tasks");pipeline.replaceChildren();tasks.replaceChildren();
   const live=data.workspace==="live";
+  q("prospectCards").replaceChildren();
+  q("legacyPipelineTable").hidden=live;
   q("staffTaskCards").replaceChildren();
   q("legacyTaskTable").hidden=live;
   const overview=data.overview||{};
@@ -242,11 +280,17 @@ async function reload(){
    const controls=document.createElement("td");
    const next=e.stage==="CONTACT_CAPTURED"?"TOUR_OFFERED":e.stage==="TOUR_OFFERED"?"TOUR_SCHEDULED":"";
    if(live && data.actionsEnabled===true){
-    const nextMilestone={
+    let nextMilestone={
       TOUR_SCHEDULED:"TOUR_COMPLETED",
       TOUR_COMPLETED:"APPLICATION_INVITED",
       APPLICATION_INVITED:"APPLICATION_RECEIVED",
-      APPLICATION_RECEIVED:"UNDER_LANDLORD_REVIEW"
+      APPLICATION_RECEIVED:"UNDER_LANDLORD_REVIEW",
+      UNDER_LANDLORD_REVIEW:"APPROVED",
+      MORE_INFO_REQUESTED:"UNDER_LANDLORD_REVIEW",
+      APPROVED:"RENTREDI_ONBOARDING",
+      RENTREDI_ONBOARDING:"LEASE_SIGNING_SCHEDULED",
+      LEASE_SIGNING_SCHEDULED:"DISCLOSURES_READY_AND_DELIVERED",
+      DISCLOSURES_READY_AND_DELIVERED:"LEASE_SIGNED"
     }[e.stage];
 
     if(nextMilestone){
@@ -255,6 +299,27 @@ async function reload(){
 
       const title=document.createElement("p");
       title.textContent="Next milestone: "+nextMilestone.replaceAll("_"," ");
+
+      if(e.stage==="UNDER_LANDLORD_REVIEW"){
+        const decision=document.createElement("select");
+        decision.setAttribute("aria-label","Landlord decision");
+
+        for(const stage of [
+          "APPROVED","DENIED","MORE_INFO_REQUESTED"
+        ]){
+          decision.add(new Option(
+            stage.replaceAll("_"," "),stage
+          ));
+        }
+
+        decision.addEventListener("change",()=>{
+          nextMilestone=decision.value;
+          title.textContent="Next milestone: "+
+            nextMilestone.replaceAll("_"," ");
+        });
+
+        form.appendChild(decision);
+      }
 
       const evidence=document.createElement("textarea");
       evidence.required=true;
@@ -303,6 +368,77 @@ async function reload(){
         form.appendChild(submissionReference);
       }
 
+      const handoffStages=[
+        "APPROVED","DENIED","MORE_INFO_REQUESTED",
+        "RENTREDI_ONBOARDING","LEASE_SIGNING_SCHEDULED",
+        "DISCLOSURES_READY_AND_DELIVERED","LEASE_SIGNED"
+      ];
+
+      let externalReference=null;
+      let providerUrl=null;
+      let signingTime=null;
+      let externalConfirmation=null;
+      let decisionConfirmation=null;
+
+      const needsReference=handoffStages.includes(nextMilestone) ||
+        e.stage==="MORE_INFO_REQUESTED" ||
+        e.stage==="UNDER_LANDLORD_REVIEW";
+
+      if(needsReference){
+        externalReference=document.createElement("input");
+        externalReference.type="text";
+        externalReference.required=true;
+        externalReference.minLength=8;
+        externalReference.maxLength=100;
+        externalReference.placeholder="External provider reference (no sensitive data)";
+        externalReference.setAttribute(
+          "aria-label","External provider reference"
+        );
+        form.appendChild(externalReference);
+      }
+
+      if(e.stage==="UNDER_LANDLORD_REVIEW"){
+        const label=document.createElement("label");
+        decisionConfirmation=document.createElement("input");
+        decisionConfirmation.type="checkbox";
+        decisionConfirmation.required=true;
+        label.append(decisionConfirmation,
+          "I recorded the landlord's independent decision");
+        form.appendChild(label);
+      }
+
+      if([
+        "APPROVED","RENTREDI_ONBOARDING",
+        "LEASE_SIGNING_SCHEDULED",
+        "DISCLOSURES_READY_AND_DELIVERED"
+      ].includes(e.stage)){
+        const label=document.createElement("label");
+        externalConfirmation=document.createElement("input");
+        externalConfirmation.type="checkbox";
+        externalConfirmation.required=true;
+        label.append(externalConfirmation,
+          "I verified this milestone with the external provider");
+        form.appendChild(label);
+      }
+
+      if(["APPROVED","RENTREDI_ONBOARDING"].includes(e.stage)){
+        providerUrl=document.createElement("input");
+        providerUrl.type="url";
+        providerUrl.required=true;
+        providerUrl.maxLength=500;
+        providerUrl.placeholder="https://external-provider.example/lease";
+        providerUrl.setAttribute("aria-label","External lease provider URL");
+        form.appendChild(providerUrl);
+      }
+
+      if(e.stage==="RENTREDI_ONBOARDING"){
+        signingTime=document.createElement("input");
+        signingTime.type="datetime-local";
+        signingTime.required=true;
+        signingTime.setAttribute("aria-label","Lease signing appointment");
+        form.appendChild(signingTime);
+      }
+
       const confirmation=document.createElement("label");
       const checkbox=document.createElement("input");
       checkbox.type="checkbox";
@@ -341,6 +477,21 @@ async function reload(){
                 } : {}),
                 ...(submissionReference ? {
                   submissionReference:submissionReference.value
+                } : {}),
+                ...(externalReference ? {
+                  externalReference:externalReference.value
+                } : {}),
+                ...(decisionConfirmation ? {
+                  humanDecisionConfirmed:decisionConfirmation.checked
+                } : {}),
+                ...(externalConfirmation ? {
+                  externalActionConfirmed:externalConfirmation.checked
+                } : {}),
+                ...(providerUrl ? {
+                  providerUrl:providerUrl.value
+                } : {}),
+                ...(signingTime ? {
+                  scheduledAt:new Date(signingTime.value).toISOString()
                 } : {})
               })
             }
@@ -408,11 +559,49 @@ async function reload(){
      }
    }
 
+   if(e.handoff){
+     const record=document.createElement("p");
+     record.className="muted";
+     record.textContent=[
+       "Leasing: "+(e.handoff.status||"pending"),
+       e.handoff.decision?
+         "Landlord decision: "+e.handoff.decision.status:"",
+       e.handoff.lease?
+         "Lease handoff: "+e.handoff.lease.status:""
+     ].filter(Boolean).join(" | ");
+     controls.appendChild(record);
+   }
+
    const updated=document.createElement("div");
    updated.className="muted";
    updated.textContent="Updated: "+stamp(e.updatedAt);
    controls.prepend(updated);
    tr.appendChild(controls);pipeline.appendChild(tr);
+
+   if(live){
+     const card=document.createElement("article");
+     card.className="staff-prospect-card";
+
+     const heading=document.createElement("h3");
+     heading.textContent=e.contact?.name||"Unknown prospect";
+
+     const description=document.createElement("p");
+     description.textContent=
+       propertyName(e.property)+" | "+e.stage.replaceAll("_"," ");
+
+     const request=document.createElement("p");
+     request.textContent=e.interest||"Rental inquiry";
+
+     const cardControls=document.createElement("div");
+     cardControls.className="staff-prospect-controls";
+     while(controls.firstChild){
+       cardControls.appendChild(controls.firstChild);
+     }
+
+     card.append(heading,description,request,details);
+     card.appendChild(cardControls);
+     q("prospectCards").appendChild(card);
+   }
   }
   const reminderRows=q("reminders");
    reminderRows.replaceChildren();

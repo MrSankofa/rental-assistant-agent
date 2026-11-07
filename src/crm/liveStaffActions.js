@@ -1,12 +1,19 @@
 "use strict";
 const {validateApplicationStep} =
   require("./applicationTracking");
+const {validateHandoffStep} =
+  require("./leasingHandoffs");
 
 const NEXT = Object.freeze({
   TOUR_SCHEDULED: "TOUR_COMPLETED",
   TOUR_COMPLETED: "APPLICATION_INVITED",
   APPLICATION_INVITED: "APPLICATION_RECEIVED",
-  APPLICATION_RECEIVED: "UNDER_LANDLORD_REVIEW"
+  APPLICATION_RECEIVED: "UNDER_LANDLORD_REVIEW",
+  MORE_INFO_REQUESTED: "UNDER_LANDLORD_REVIEW",
+  APPROVED: "RENTREDI_ONBOARDING",
+  RENTREDI_ONBOARDING: "LEASE_SIGNING_SCHEDULED",
+  LEASE_SIGNING_SCHEDULED: "DISCLOSURES_READY_AND_DELIVERED",
+  DISCLOSURES_READY_AND_DELIVERED: "LEASE_SIGNED"
 });
 
 function actionsEnabled(env) {
@@ -38,7 +45,11 @@ function validateMilestone(current, input) {
 
   const expected = NEXT[current.stage];
 
-  if (!expected || input.stage !== expected) {
+  const allowed=current.stage==="UNDER_LANDLORD_REVIEW"
+    ? ["APPROVED","DENIED","MORE_INFO_REQUESTED"]
+    : expected?[expected]:[];
+
+  if (!allowed.includes(input.stage)) {
     throw Object.assign(
       new Error("Milestone not permitted from current stage"),
       {status:409}
@@ -65,14 +76,25 @@ function validateMilestone(current, input) {
     TOUR_COMPLETED: "Invite prospect to apply",
     APPLICATION_INVITED: "Await application submission",
     APPLICATION_RECEIVED: "Review submitted application",
-    UNDER_LANDLORD_REVIEW: "Landlord reviews application"
+    UNDER_LANDLORD_REVIEW: "Landlord reviews application",
+    APPROVED: "Start external RentRedi onboarding",
+    DENIED: "Complete required applicant notice outside the CRM",
+    MORE_INFO_REQUESTED: "Await external information response",
+    RENTREDI_ONBOARDING: "Schedule external lease signing",
+    LEASE_SIGNING_SCHEDULED: "Prepare and deliver disclosures",
+    DISCLOSURES_READY_AND_DELIVERED: "Verify external signatures",
+    LEASE_SIGNED: "Verify move-in requirements separately"
   };
 
   return {
-    stage: expected,
+    stage: input.stage,
+    confirmed:true,
     evidence: input.evidence.trim(),
-    nextAction: nextActions[expected],
-    application:validateApplicationStep(expected,input)
+    nextAction: nextActions[input.stage],
+    application:validateApplicationStep(input.stage,input),
+    handoff:validateHandoffStep(
+      input.stage,input,{fromStage:current.stage}
+    )
   };
 }
 

@@ -39,9 +39,16 @@ describe("Phase 8B staff UI safety",()=>{
       'APPLICATION_RECEIVED:"UNDER_LANDLORD_REVIEW"'
     );
 
-    expect(html).not.toContain(
+    // Approval is now available only from landlord review.
+    // The server validates the current stage and verified evidence.
+    expect(html).toContain(
       'UNDER_LANDLORD_REVIEW:"APPROVED"'
     );
+    expect(html).toContain(
+      '"APPROVED","DENIED","MORE_INFO_REQUESTED"'
+    );
+    expect(html).toContain("humanDecisionConfirmed");
+    expect(html).toContain("data.actionsEnabled===true");
   });
 
   test("live dashboard cannot enable outbound delivery",()=>{
