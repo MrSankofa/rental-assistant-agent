@@ -68,7 +68,10 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
       id:t.id,engagementId:t.engagementId,status:t.status,
       summary:t.summary,dueAt:t.dueAt,draft:t.draft||"",
       draftOrigin:t.draftOrigin||"template",deliveryStatus:t.delivery?.status||"not-sent",
-      approved:Boolean(t.approved),automatedDelivery:false
+      approved:Boolean(t.approved),automatedDelivery:false,
+      source:t.source||"",
+      policyVersion:t.policyVersion||"",
+      staffResolution:t.staffResolution||null
     }))
   };
 }

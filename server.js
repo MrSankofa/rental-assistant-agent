@@ -8,6 +8,8 @@ const { askAI } = require("./src/agent/openai");
 
 
 const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
+const { featureEnabled: reminderStaffEnabled, decideReminder } =
+  require("./src/crm/staffReminderActions");
 const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
 const { generateFollowupTasks } = require("./src/crm/followups");
@@ -193,6 +195,8 @@ const server = http.createServer(async (req, res) => {
         const dashboard = summarizeDashboard(
           contacts, engagements, tasks,
           {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging",actionsEnabled:liveStaffMode&&actionsEnabled(process.env)});
+        dashboard.reminderStaffActionsEnabled =
+          liveStaffMode && reminderStaffEnabled(process.env);
         dashboard.reminders = liveStaffMode
           ? planTourReminders(
               engagements, await crm.store.list("bookings"), {now:new Date()}
@@ -204,11 +208,20 @@ const server = http.createServer(async (req, res) => {
     }
     // Live actions remain disabled unless explicitly released on the private service.
     if (liveStaffMode) {
+      const reminderPath = pathname.match(
+        /^\/api\/staff\/reminders\/(tr_[0-9a-f]{40})\/decision$/
+      );
       const stagePath = pathname.match(
         /^\/api\/staff\/engagements\/([a-zA-Z0-9_-]+)\/stage$/
       );
-      if (req.method !== "POST" || !stagePath ||
-          !actionsEnabled(process.env)) {
+      const reminderRequest = Boolean(
+        reminderPath && reminderStaffEnabled(process.env)
+      );
+      const milestoneRequest = Boolean(
+        stagePath && actionsEnabled(process.env)
+      );
+      if (req.method !== "POST" ||
+          (!reminderRequest && !milestoneRequest)) {
         sendJson(res,403,{error:"Live staff actions disabled"});
         return;
       }
@@ -238,6 +251,14 @@ const server = http.createServer(async (req, res) => {
       if (!body) return;
 
       try {
+        if (reminderRequest) {
+          const result=await decideReminder(
+            crm,reminderPath[1],body,verifiedStaff.actor
+          );
+          sendJson(res,200,result);
+          return;
+        }
+
         const current=await crm.history(stagePath[1]);
         const milestone=validateMilestone(current,body);
         const result=await crm.transition(

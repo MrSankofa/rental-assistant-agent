@@ -329,9 +329,80 @@ async function reload(){
      });
      controls.appendChild(b);
    };
-   if(live){
+   if(live && data.reminderStaffActionsEnabled===true &&
+      t.source==="tour-reminder-planner" &&
+      t.status==="pending-approval"){
+
+     const form=document.createElement("form");
+     form.className="staff-reminder-decision";
+
+     const reason=document.createElement("textarea");
+     reason.required=true;
+     reason.minLength=10;
+     reason.maxLength=300;
+     reason.rows=3;
+     reason.placeholder="Document your decision (10-300 characters)";
+     reason.setAttribute("aria-label","Reminder decision reason");
+
+     const confirmation=document.createElement("label");
+     const checkbox=document.createElement("input");
+     checkbox.type="checkbox";
+     checkbox.required=true;
+     confirmation.append(checkbox,"I reviewed this reminder");
+
+     const complete=document.createElement("button");
+     complete.type="button";
+     complete.textContent="Complete review";
+
+     const dismiss=document.createElement("button");
+     dismiss.type="button";
+     dismiss.textContent="Dismiss reminder";
+
+     async function decide(action){
+       if(!checkbox.checked || !reason.checkValidity()){
+         reason.reportValidity();
+         if(!checkbox.checked)message("Confirm reminder review");
+         return;
+       }
+
+       if(!confirm("Record this "+action+" decision in the live CRM?"))
+         return;
+
+       complete.disabled=true;
+       dismiss.disabled=true;
+
+       try{
+         await json(
+           "/api/staff/reminders/"+
+             encodeURIComponent(t.id)+"/decision",
+           {
+             method:"POST",
+             headers:{"Content-Type":"application/json"},
+             body:JSON.stringify({
+               action,
+               reason:reason.value,
+               confirmed:true
+             })
+           }
+         );
+         await reload();
+       }catch(error){
+         message(error.message);
+         complete.disabled=false;
+         dismiss.disabled=false;
+       }
+     }
+
+     complete.addEventListener("click",()=>decide("complete"));
+     dismiss.addEventListener("click",()=>decide("dismiss"));
+
+     form.append(reason,confirmation,complete,dismiss);
+     controls.appendChild(form);
+
+   }else if(live){
      const info=document.createElement("span");info.className="muted";
-     info.textContent="Live actions disabled. Review manually."; controls.appendChild(info);
+     info.textContent="No live task action available.";
+     controls.appendChild(info);
    }else if(t.status==="pending-approval"){
      actionButton("Generate AI draft","generate-draft");
      actionButton("Save edited draft","edit-draft",()=>({draft:editor.value}));
