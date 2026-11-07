@@ -65,6 +65,8 @@ async function generateFollowupTasks(crm, { now = new Date(), scope = crm.scope 
       source: "scheduler",
       policyVersion: POLICY_VERSION,
       draft: draftFor(engagement),
+      channel: "email",
+      messagePurpose: "routine-rental-followup",
       automatedDelivery: false // Actual delivery remains disabled until integration is verified.
     };
     const inserted = await crm.store.create("tasks", taskId, task);
