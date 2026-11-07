@@ -11,6 +11,7 @@ const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffAction
 const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
 const { generateFollowupTasks } = require("./src/crm/followups");
+const { planTourReminders } = require("./src/crm/tourReminderPlanner");
 const { prepareDraft, editDraft, approveAndSend, deliveryMode } = require("./src/crm/messaging");
 const { staffEnabled, liveStaffEnabled, legacyAdminEnabled, summarizeDashboard } = require("./src/crm/staff");
 const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
@@ -186,9 +187,18 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && pathname === "/api/staff/dashboard") {
       try {
-        sendJson(res,200,summarizeDashboard(
-          await crm.listContacts(), await crm.listEngagements(), await crm.listTasks(),
-          {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging",actionsEnabled:liveStaffMode&&actionsEnabled(process.env)}));
+        const contacts = await crm.listContacts();
+        const engagements = await crm.listEngagements();
+        const tasks = await crm.listTasks();
+        const dashboard = summarizeDashboard(
+          contacts, engagements, tasks,
+          {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging",actionsEnabled:liveStaffMode&&actionsEnabled(process.env)});
+        dashboard.reminders = liveStaffMode
+          ? planTourReminders(
+              engagements, await crm.store.list("bookings"), {now:new Date()}
+            )
+          : [];
+        sendJson(res,200,dashboard);
       } catch(e) { sendJson(res,500,{error:"Unable to load staff dashboard"}); }
       return;
     }

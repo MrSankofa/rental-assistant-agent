@@ -78,6 +78,16 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
 </select></label>
 </div>
 <p class="muted" id="filterSummary"></p><div class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Request</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
+<section>
+<h2>Tour reminders and outcome reviews</h2>
+<p class="muted">Read-only scheduling preview from verified Calendly bookings. No reminders are sent and no tasks are written by this preview.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>Review</th><th>Due</th><th>Tour starts</th><th>Status</th></tr></thead>
+<tbody id="reminders"></tbody>
+</table>
+</div>
+</section>
 <section><h2>Follow-up review queue</h2><p class="muted">Follow-up review and drafting workspace. Automatic email and SMS delivery are currently disabled.</p>
 <div class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
 </main><script>
@@ -265,7 +275,28 @@ async function reload(){
    controls.prepend(updated);
    tr.appendChild(controls);pipeline.appendChild(tr);
   }
-  for(const t of data.tasks){
+  const reminderRows=q("reminders");
+   reminderRows.replaceChildren();
+
+   for(const reminder of data.reminders||[]){
+     const row=document.createElement("tr");
+     cell(row,reminder.summary);
+     cell(row,stamp(reminder.dueAt));
+     cell(row,stamp(reminder.startsAt));
+     cell(row,reminder.status);
+     reminderRows.appendChild(row);
+   }
+
+   if(!reminderRows.children.length){
+     const row=document.createElement("tr");
+     const td=document.createElement("td");
+     td.colSpan=4;
+     td.textContent="No tour reviews due or upcoming in the planning window";
+     row.appendChild(td);
+     reminderRows.appendChild(row);
+   }
+
+   for(const t of data.tasks){
    const tr=document.createElement("tr");
    cell(tr,t.summary);cell(tr,stamp(t.dueAt));cell(tr,t.status);
    const draftCell=document.createElement("td");
