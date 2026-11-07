@@ -10,7 +10,7 @@ function validate(env) {
     GOOGLE_CLOUD_PROJECT:"altruistic-platform",
     CRM_BACKEND:"firestore",
     CRM_DATABASE:"rental-email-staging",
-    CRM_SCOPE:"rental-staging",
+    CRM_SCOPE:"rental-p9b-test",
     CRM_TOUR_REMINDERS_ENABLED:"true",
     CRM_TOUR_REMINDERS_APPROVAL:"GENERATE_STAGING_TASKS_ONLY",
     CRM_DELIVERY_MODE:"disabled"
@@ -30,7 +30,7 @@ function validate(env) {
 
 async function run(env=process.env) {
   validate(env);
-  const crm=new CRM(makeStore(env),"rental-staging");
+  const crm=new CRM(makeStore(env),"rental-p9b-test");
   return reconcileTourReminders(crm);
 }
 

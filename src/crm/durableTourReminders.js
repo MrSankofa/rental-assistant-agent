@@ -8,7 +8,7 @@ const HOUR = 3600000;
 
 // Deliberately unavailable for production CRM scopes.
 function requireStaging(crm) {
-  if (!crm || crm.scope !== "rental-staging" || !crm.store)
+  if (!crm || !["rental-staging","rental-p9b-test"].includes(crm.scope) || !crm.store)
     throw Error("Tour reminder writes require staging CRM");
   if (crm.store.databaseId !== undefined &&
       crm.store.databaseId !== "rental-email-staging")
