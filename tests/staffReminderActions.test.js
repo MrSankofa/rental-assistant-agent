@@ -220,3 +220,90 @@ describe("Phase 9D staff reminder decisions",()=>{
     expect(await f.store.list("audits")).toHaveLength(0);
   });
 });
+
+describe("Phase 9D durable audit recovery",()=>{
+  const {
+    ensureReminderAudit,
+    reconcileReminderAudits
+  }=require("../src/crm/staffReminderActions");
+
+  test("failed audit can be reconstructed from saved decision",async()=>{
+    const f=fixture();
+    await seed(f);
+
+    const originalCreate=f.store.create.bind(f.store);
+    let failOnce=true;
+
+    f.store.create=async(collection,id,value)=>{
+      if(collection==="audits" && failOnce){
+        failOnce=false;
+        throw Error("Simulated audit outage");
+      }
+      return originalCreate(collection,id,value);
+    };
+
+    await expect(decideReminder(f.crm,ID,{
+      action:"dismiss",
+      confirmed:true,
+      reason:"Reviewed canceled tour and closed reminder"
+    },ACTOR)).rejects.toThrow("Simulated audit outage");
+
+    const saved=(await f.store.get("tasks",ID)).value;
+
+    expect(saved.status).toBe("cancelled");
+    expect(saved.staffResolution.auditId)
+      .toMatch(/^a_[0-9a-f]{40}$/);
+
+    expect(await f.store.list("audits")).toHaveLength(0);
+
+    const repaired=await reconcileReminderAudits(f.crm);
+
+    expect(repaired).toEqual({checked:1,repaired:1});
+
+    const audits=await f.store.list("audits");
+    expect(audits).toHaveLength(1);
+    expect(audits[0].id).toBe(saved.staffResolution.auditId);
+    expect(audits[0].actor).toBe(ACTOR);
+    expect(audits[0].details.reason).toBe(
+      "Reviewed canceled tour and closed reminder"
+    );
+
+    // Reconciliation is safe to repeat.
+    expect(await reconcileReminderAudits(f.crm))
+      .toEqual({checked:1,repaired:0});
+    expect(await f.store.list("audits")).toHaveLength(1);
+  });
+
+  test("same audit receipt cannot be silently overwritten",async()=>{
+    const f=fixture();
+    await seed(f);
+
+    await decideReminder(f.crm,ID,{
+      action:"complete",
+      confirmed:true,
+      reason:"Staff verified the appointment details"
+    },ACTOR);
+
+    const task=(await f.store.get("tasks",ID)).value;
+    const auditId=task.staffResolution.auditId;
+    const row=await f.store.get("audits",auditId);
+
+    await f.store.replace("audits",auditId,{
+      ...row.value,
+      actor:"unexpected-actor"
+    },row.version);
+
+    await expect(
+      ensureReminderAudit(f.crm,task)
+    ).rejects.toThrow("Reminder audit collision");
+  });
+
+  test("audit recovery refuses non-production database",async()=>{
+    const f=fixture();
+    f.store.databaseId="rental-email-staging";
+
+    await expect(
+      reconcileReminderAudits(f.crm)
+    ).rejects.toThrow("Live CRM required");
+  });
+});
