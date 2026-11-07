@@ -20,6 +20,38 @@ details{margin-top:8px}
 details summary{cursor:pointer;color:#245bd5}
 details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.85rem}
 @media(max-width:700px){.scroll{overflow:auto}th,td{min-width:115px}}
+/* Keep milestone controls readable inside the pipeline. */
+.staff-milestone-form{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-width:260px;
+  max-width:360px;
+}
+.staff-milestone-form p{margin:0;font-weight:bold}
+.staff-milestone-form textarea{
+  box-sizing:border-box;
+  width:100%;
+  min-height:90px;
+  padding:10px;
+  font:inherit;
+  border:1px solid #aab5c4;
+  border-radius:6px;
+  resize:vertical;
+}
+.staff-milestone-form label{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  font-size:.9rem;
+  line-height:1.4;
+}
+.staff-milestone-form label input{
+  margin-top:3px;
+}
+.staff-milestone-form button{
+  align-self:flex-start;
+}
 </style></head>
 <body><main>
 <header><h1>Rental Assistant | Staff CRM</h1>
@@ -46,7 +78,7 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
 </select></label>
 </div>
 <p class="muted" id="filterSummary"></p><div class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Request</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
-<section><h2>Follow-up review queue</h2><p class="muted">Generate or edit a draft, approve it, then simulate delivery. No real email will be sent.</p>
+<section><h2>Follow-up review queue</h2><p class="muted">Follow-up review and drafting workspace. Automatic email and SMS delivery are currently disabled.</p>
 <div class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
 </main><script>
 const q=id=>document.getElementById(id);
@@ -99,7 +131,9 @@ async function reload(){
   q("filterSummary").textContent=
     `Showing ${filtered.length} of ${data.pipeline.length} prospects`;
   q("workspaceDescription").textContent=live?
-    "Private live CRM: real inquiries. Read-only review; email, follow-up generation, and stage changes are disabled until approved.":
+    (data.actionsEnabled===true
+      ? "Private live CRM: authenticated staff may record verified milestones. Automated messages and follow-up delivery remain disabled."
+      : "Private live CRM: read-only review. Staff milestone changes and automated messaging are disabled.") :
     "Private staging workspace. Fictional data only; messaging is simulated.";
   q("newInquiryCount").textContent="New inquiries awaiting staff review: "+(data.attention?.newInquiryCount ?? 0);
   q("generate").hidden=live;
@@ -163,7 +197,7 @@ async function reload(){
       const checkbox=document.createElement("input");
       checkbox.type="checkbox";
       checkbox.required=true;
-      confirmation.append(checkbox," I independently verified this milestone");
+      confirmation.append(checkbox,"I independently verified this milestone");
 
       const submit=document.createElement("button");
       submit.type="submit";
