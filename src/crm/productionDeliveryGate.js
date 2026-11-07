@@ -29,8 +29,7 @@ function authorizeProductionEmail({env={},task,engagement,contact,now=new Date()
       task.status!=="ready-for-automatic-delivery" ||
       task.routing!=="autonomous" ||
       task.automatedDelivery!==false ||
-      task.delivery?.status==="accepted" ||
-      task.delivery?.status==="uncertain" ||
+      task.delivery != null ||
       task.engagementId!==engagement.id ||
       task.engagementStage!==engagement.stage ||
       task.engagementUpdatedAt!==engagement.updatedAt ||
