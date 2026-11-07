@@ -18,3 +18,6 @@ rental-assistant-index.before-brand.html
 
 # System files
 .DS_Store
+
+/test-results/
+/playwright-report/
