@@ -1,4 +1,5 @@
 "use strict";
+const { summarizePipeline } = require("./staffInsights");
 
 // Cloud Run IAM is the authentication boundary for both dedicated staff services.
 // Never enable staff endpoints on a public prospect-facing service.
@@ -38,13 +39,15 @@ function legacyAdminEnabled(env) {
     env.CRM_REAL_INTAKE_ENABLED !== "true";
 }
 
-function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disabled", workspace="staging"}={}) {
+function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disabled", workspace="staging",actionsEnabled=false}={}) {
   const byId = new Map(contacts.map(c => [c.id, c]));
   const pipeline = engagements.map(e => {
     const contact = byId.get(e.contactId);
     return {
-      id:e.id, property:e.targetId, stage:e.stage,
+      id:e.id, property:e.targetId, interest:e.interest||"", stage:e.stage,
       nextAction:e.nextAction||"", updatedAt:e.updatedAt, createdAt:e.createdAt,
+      application:e.application||null,
+      handoff:e.handoff||null,
       contact:contact ? {name:contact.name,email:contact.email,phone:contact.phone,
         consent:contact.consent,preferredChannel:contact.preferredChannel} : null
     };
@@ -53,6 +56,7 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
   const unreviewed = pipeline.filter(e => e.stage === "CONTACT_CAPTURED");
   return {
     workspace,
+    actionsEnabled:workspace==="live" && actionsEnabled===true,
     deliveryMode:workspace === "live" ? "disabled" : deliveryMode,
     attention: {
       newInquiryCount:unreviewed.length,
@@ -61,11 +65,15 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
       ) || null
     },
     pipeline,
+    overview:summarizePipeline(pipeline),
     tasks:tasks.map(t => ({
       id:t.id,engagementId:t.engagementId,status:t.status,
       summary:t.summary,dueAt:t.dueAt,draft:t.draft||"",
       draftOrigin:t.draftOrigin||"template",deliveryStatus:t.delivery?.status||"not-sent",
-      approved:Boolean(t.approved),automatedDelivery:false
+      approved:Boolean(t.approved),automatedDelivery:false,
+      source:t.source||"",
+      policyVersion:t.policyVersion||"",
+      staffResolution:t.staffResolution||null
     }))
   };
 }

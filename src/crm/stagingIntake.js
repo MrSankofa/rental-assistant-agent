@@ -20,26 +20,58 @@ function requireStagingOrigin(origin, allowedOrigin) {
   return typeof origin === "string" && origin === allowedOrigin;
 }
 
+function normalizePhone(value) {
+  return typeof value === "string"
+    ? value.trim().replace(/[\s().+-]/g, "")
+    : "";
+}
+
 function validateFictionalIntake(data) {
-  const bad = () => Object.assign(new Error("Staging accepts fictional sample data only. Use the provided .test example."), { status: 400 });
+  const bad = () => Object.assign(
+    new Error("Staging accepts fictional sample data only. Use the provided .test example or a 555-01xx test phone number."),
+    { status: 400 }
+  );
+
   if (!data || typeof data !== "object") throw bad();
+
   const name = typeof data.name === "string" ? data.name.trim() : "";
-  const email = typeof data.email === "string" ? data.email.trim().toLowerCase() : "";
-  if (!/^Fictional(?: [A-Za-z]{2,25}){1,3}$/.test(name) ||
-      !/^[a-z0-9._+-]{3,50}@example\.test$/.test(email) ||
-      data.phone !== "" ||
-      data.domain !== "rental" ||
+  const email = typeof data.email === "string"
+    ? data.email.trim().toLowerCase()
+    : "";
+  const phone = normalizePhone(data.phone);
+
+  if (!/^Fictional(?: [A-Za-z]{2,25}){1,3}$/.test(name)) throw bad();
+  if (!email && !phone) throw bad();
+
+  if (email &&
+      !/^[a-z0-9._+-]{3,50}@example\.test$/.test(email)) {
+    throw bad();
+  }
+
+  // NANP 555-0100 through 555-0199 are used here as fictional test numbers.
+  if (phone &&
+      !/^(?:1)?[2-9][0-9]{2}55501[0-9]{2}$/.test(phone)) {
+    throw bad();
+  }
+
+  if (data.domain !== "rental" ||
       data.targetId !== "ziegler" ||
-      data.preferredChannel !== "email" ||
-      !["Tour inquiry", "Application information", "General property question"].includes(data.interest) ||
+      !["Tour inquiry", "Human follow-up", "Application information", "General property question"].includes(data.interest) ||
       !data.consent ||
       data.consent.recording !== true ||
       data.consent.email !== false ||
       data.consent.sms !== false) {
     throw bad();
   }
-  // Normalize permissible test fields; don't let caller-controlled source be recorded.
-  return { ...data, name, email, source: "private-staging-form" };
+
+  return {
+    ...data,
+    name,
+    email,
+    phone,
+    preferredChannel: email ? "email" : "none",
+    source: "private-staging-form"
+  };
 }
 
 module.exports = { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake };

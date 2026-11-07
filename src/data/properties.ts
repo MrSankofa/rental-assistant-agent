@@ -2,7 +2,7 @@ import { Property } from "../types/property";
 
 export const properties: Record<string, Property> = {
   virginia: {
-    name: "Virginia",
+    name: "Detroit rental",
     address: "Virginia Park St",
     city: "Detroit",
     state: "MI",
@@ -25,7 +25,7 @@ export const properties: Record<string, Property> = {
   },
 
   ziegler: {
-    name: "Ziegler",
+    name: "Dearborn Heights rental",
     address: "4932 Ziegler St",
     city: "Dearborn Heights",
     state: "MI",
@@ -49,6 +49,6 @@ export const properties: Record<string, Property> = {
     applicationAvailableFrom: "2026-10-24",
 
     showingUrl:
-      "https://calendly.com/altruistic-re/ziegler-house-showing",
+      "https://calendly.com/altruistic-re/dearborn-heights-rental",
   },
 };

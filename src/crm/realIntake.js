@@ -5,7 +5,7 @@
 const DB = "rental-leads-prod";
 const SCOPE = "rental-live";
 const SERVICES = new Set(["rental-assistant", "rental-assistant-live-candidate"]);
-const INTERESTS = new Set(["Tour inquiry", "Application information", "General property question"]);
+const INTERESTS = new Set(["Tour inquiry", "Human follow-up", "Application information", "General property question"]);
 const fail = () => Object.assign(new Error("Invalid rental inquiry"), { status: 400 });
 
 function trustedHttps(value, exactHost) {
@@ -43,32 +43,62 @@ function realIntakeEnabled(env, crmConfigured) {
 
 function validateRealRentalIntake(input, getPropertyInformation) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw fail();
-  const name = typeof input.name === "string" ? input.name.trim().replace(/ +/g, " ") : "";
-  const email = typeof input.email === "string" ? input.email.trim().toLowerCase() : "";
+
+  const name = typeof input.name === "string"
+    ? input.name.trim().replace(/ +/g, " ")
+    : "";
+
+  const email = typeof input.email === "string"
+    ? input.email.trim().toLowerCase()
+    : "";
+
+  const phone = typeof input.phone === "string"
+    ? input.phone.trim().replace(/[\s().-]/g, "")
+    : "";
+
   const interest = input.interest;
   const consent = input.consent;
 
   if (!/^[\p{L}\p{M}][\p{L}\p{M} .'’-]{1,79}$/u.test(name) ||
-      !/^[^\s@<>]{1,64}@[^\s@<>]{1,189}$/.test(email) ||
+      (!email && !phone) ||
+      (email && !/^[^\s@<>]{1,64}@[^\s@<>]{1,189}$/.test(email)) ||
       email.length > 254 ||
+      (phone && !/^\+?[0-9]{10,15}$/.test(phone)) ||
       !INTERESTS.has(interest) ||
       input.domain !== "rental" ||
       input.targetId !== "ziegler" ||
-      input.preferredChannel !== "email" ||
-      (input.phone !== "" && input.phone !== undefined) ||
-      !consent || consent.recording !== true ||
-      typeof consent.email !== "boolean" || consent.sms !== false ||
-      typeof getPropertyInformation !== "function") throw fail();
+      !consent ||
+      consent.recording !== true ||
+      typeof consent.email !== "boolean" ||
+      (consent.email === true && !email) ||
+      consent.sms !== false ||
+      typeof getPropertyInformation !== "function") {
+    throw fail();
+  }
 
   const found = getPropertyInformation("ziegler");
+
   if (found?.found !== true || found.property?.available !== true) {
-    throw Object.assign(new Error("Rental inquiries are unavailable"), {status:409});
+    throw Object.assign(
+      new Error("Rental inquiries are unavailable"),
+      {status:409}
+    );
   }
+
   return {
-    name, email, phone:"", preferredChannel:"email",
-    domain:"rental",targetId:"ziegler",interest,
+    name,
+    email,
+    phone,
+    preferredChannel: email ? "email" : "none",
+    domain:"rental",
+    targetId:"ziegler",
+    interest,
     source:"rental-assistant-live-form",
-    consent:{recording:true,email:consent.email,sms:false}
+    consent:{
+      recording:true,
+      email:consent.email,
+      sms:false
+    }
   };
 }
 

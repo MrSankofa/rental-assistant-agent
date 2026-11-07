@@ -9,7 +9,7 @@ const POLICIES = Object.freeze({
   TOUR_OFFERED: { delayHours: 48, summary: "Check Calendly showing status before considering a reply" },
   APPLICATION_INVITED: { delayHours: 72, summary: "Check application status before considering a reply" }
 });
-const PROPERTY_NAMES = { ziegler: "Ziegler", virginia: "Virginia" };
+const PROPERTY_NAMES = { ziegler: "the Dearborn Heights rental", virginia: "the Detroit rental" };
 function idFor(scope, engagement) {
   const changeAt = engagement.updatedAt || engagement.createdAt;
   const key = [scope, engagement.id, engagement.stage, changeAt, POLICY_VERSION].join("|");

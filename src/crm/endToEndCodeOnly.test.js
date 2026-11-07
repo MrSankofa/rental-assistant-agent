@@ -72,7 +72,7 @@ describe("code-only CRM journey: fictional inquiry to controlled follow-up", () 
       routing: "autonomous",
       automatedDelivery: false
     });
-    expect(task.draft).toContain("Ziegler");
+    expect(task.draft).toContain("Dearborn Heights rental");
 
     const fakeTransport = jest.fn(async message => {
       expect(message.to).toBe(FAKE_EMAIL);

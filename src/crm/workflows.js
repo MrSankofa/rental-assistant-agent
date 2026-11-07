@@ -1,6 +1,10 @@
 "use strict";
 const crypto = require("crypto");
 const { StoreConflict } = require("./storage");
+const {recordApplication} =
+  require("./applicationTracking");
+const {recordHandoff} =
+  require("./leasingHandoffs");
 
 const RENTAL_STAGES = ["INQUIRY_NEW","CONTACT_CAPTURED","TOUR_OFFERED","TOUR_SCHEDULED","TOUR_COMPLETED","APPLICATION_INVITED","APPLICATION_RECEIVED","UNDER_LANDLORD_REVIEW","APPROVED","DENIED","MORE_INFO_REQUESTED","RENTREDI_ONBOARDING","LEASE_SIGNING_SCHEDULED","DISCLOSURES_READY_AND_DELIVERED","LEASE_SIGNED","MOVE_IN_FUNDS_VERIFIED","KEYS_RELEASED","MOVE_IN_CHECKLIST_PENDING","MOVE_IN_COMPLETED","WITHDRAWN","TOUR_CANCELLED","NO_SHOW"];
 const COMMUNITY_STAGES = ["NEW","INTEREST_RECORDED","INVITED","RSVP_CONFIRMED","ATTENDED","THANKED","FOLLOW_UP","CLOSED","WITHDRAWN"];
@@ -87,15 +91,96 @@ class CRM {
     }
   }
   const engagementId="e_"+hash(contactId+"|"+domain+"|"+targetId).slice(0,40);
+  const nextAction =
+    domain === "rental" && interest === "Human follow-up"
+      ? "Landlord/property manager follow up"
+      : "Staff review intake";
+
   const engagement={id:engagementId,contactId,domain,targetId,source,interest,
     stage:domain==="rental"?"CONTACT_CAPTURED":"INTEREST_RECORDED",
-    nextAction:"Staff review intake",nextActionOwner:"staff",nextActionAt:now,
+    nextAction,nextActionOwner:"staff",nextActionAt:now,
     createdAt:now,updatedAt:now,history:[{at:now,actor,stage:domain==="rental"?"CONTACT_CAPTURED":"INTEREST_RECORDED"}]};
   const wasCreated=await this.store.create("engagements",engagementId,engagement);
+
   if(wasCreated) {
     const interactionId=id();
-    await this.store.create("interactions",interactionId,{id:interactionId,engagementId,direction:"inbound",channel:"form",source,summary:"Consented contact intake",at:now});
-    await this.audit(actor,"intake",engagementId,{domain,targetId,source});
+    await this.store.create("interactions",interactionId,{
+      id:interactionId,
+      engagementId,
+      direction:"inbound",
+      channel:"form",
+      source,
+      summary:"Consented contact intake",
+      at:now
+    });
+
+    await this.audit(actor,"intake",engagementId,{
+      domain,targetId,source
+    });
+  } else {
+    // One engagement represents this prospect + property relationship.
+    // A later form submission may change what the prospect is asking for
+    // without creating a duplicate engagement or rewinding its stage.
+    let updated=false;
+
+    for(let attempt=0;attempt<4;attempt++) {
+      const row=await this.store.get("engagements",engagementId);
+      if(!row) throw new StoreConflict();
+
+      const existing=row.value;
+
+      const latestNextAction =
+        domain==="rental" && interest==="Human follow-up"
+          ? "Landlord/property manager follow up"
+          : "Staff review intake";
+
+      if(existing.interest===interest &&
+         existing.nextAction===latestNextAction) {
+        updated=true;
+        break;
+      }
+
+      const revised={
+        ...existing,
+        interest,
+        nextAction:latestNextAction,
+        nextActionOwner:"staff",
+        nextActionAt:now,
+        updatedAt:now
+      };
+
+      try {
+        await this.store.replace(
+          "engagements",
+          engagementId,
+          revised,
+          row.version
+        );
+
+        const interactionId=id();
+
+        await this.store.create("interactions",interactionId,{
+          id:interactionId,
+          engagementId,
+          direction:"inbound",
+          channel:"form",
+          source,
+          summary:"Updated rental request: "+interest,
+          at:now
+        });
+
+        await this.audit(actor,"intake-updated",engagementId,{
+          domain,targetId,source,interest
+        });
+
+        updated=true;
+        break;
+      } catch(error) {
+        if(!(error instanceof StoreConflict)) throw error;
+      }
+    }
+
+    if(!updated) throw new StoreConflict();
   }
   // Public callers receive no internal IDs, contact fields, or existence information.
   return origin==="public"?{received:true,message:"Thank you. Your inquiry has been recorded."}:
@@ -117,13 +202,36 @@ class CRM {
    const e=row.value;
    const transitions=e.domain==="rental"?NEXT_RENTAL:NEXT_COMMUNITY;
    if(!(transitions[e.stage] || []).includes(target)) throw Object.assign(new Error("Invalid stage transition"),{status:409});
-   if(STAFF_REQUIRED.has(target)&&actor!=="staff" || APPROVAL_STAGES.has(target)&&input.confirmed!==true)
+   if(STAFF_REQUIRED.has(target)&&
+      !(actor==="staff" ||
+        (typeof actor==="string" &&
+         /^staff:accounts\.google\.com:[0-9]{6,30}$/.test(actor))) ||
+      APPROVAL_STAGES.has(target)&&input.confirmed!==true)
      throw Object.assign(new Error("Staff confirmation required"),{status:403});
    // External milestones must include an evidence reference or recorded staff attestation.
    if(STAFF_REQUIRED.has(target)&&!safeText(input.evidence,300))
      throw Object.assign(new Error("Evidence required"),{status:400});
    const now=new Date().toISOString();
    e.history.push({at:now,actor,from:e.stage,stage:target,evidence:input.evidence||""});
+   if(this.scope==="rental-live" &&
+      (["APPLICATION_INVITED","APPLICATION_RECEIVED"].includes(target) ||
+       (target==="UNDER_LANDLORD_REVIEW" &&
+        e.stage==="APPLICATION_RECEIVED"))){
+     e.application=recordApplication(
+       e.application,target,input.application,now
+     );
+   }
+   if(this.scope==="rental-live" &&
+      (["APPROVED","DENIED","MORE_INFO_REQUESTED",
+        "RENTREDI_ONBOARDING","LEASE_SIGNING_SCHEDULED",
+        "DISCLOSURES_READY_AND_DELIVERED","LEASE_SIGNED"
+      ].includes(target) ||
+       (target==="UNDER_LANDLORD_REVIEW" &&
+        e.stage==="MORE_INFO_REQUESTED"))){
+     e.handoff=recordHandoff(
+       e.handoff,e.application,target,input.handoff,now
+     );
+   }
    e.stage=target;e.updatedAt=now;e.nextAction=safeText(input.nextAction,200);
    e.nextActionOwner=e.nextAction?"staff":"";e.nextActionAt=e.nextAction?now:null;
    try{

@@ -13,7 +13,8 @@
   "scripts": {
     "test": "jest --runInBand",
     "build": "tsc src/agent/tools.ts --module commonjs --target es2019 --outDir dist --skipLibCheck",
-    "start": "node server.js"
+    "start": "node server.js",
+    "check:startup": "node --check server.js && node --check scripts/calendly-webhook-server.js"
   },
   "repository": {
     "type": "git",

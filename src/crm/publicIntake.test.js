@@ -57,7 +57,7 @@ describe("public intake route orchestration without external I/O",()=>{
   expect(second).toEqual(first);
   expect(await crm.listContacts()).toHaveLength(1);
   expect(await crm.listEngagements()).toHaveLength(1);
-  expect((await crm.listEngagements())[0].stage).toBe("CONTACT_CAPTURED");
+  expect((await crm.listEngagements())[0].stage).toBe("TOUR_OFFERED");
   expect(verify).toHaveBeenCalledTimes(2);
  });
  test("does not persist invalid fields or accept real people in staging",async()=>{
@@ -90,4 +90,95 @@ test("real intake fails closed when human verification fails",async()=>{
  lookupProperty:lookup,verify:async()=>{throw Object.assign(new Error("Human verification required"),{status:403})}
  })).rejects.toHaveProperty("status",403);
  expect(await crm.listContacts()).toHaveLength(0);
+});
+
+test("verified production tour inquiry returns a trusted booking link", async () => {
+  const crm = new CRM(new MemoryStore(),"rental-live");
+  const propertyLookup = () => ({
+    found:true,
+    property:{
+      available:true,
+      showingUrl:"https://calendly.com/altruistic-re/dearborn-heights-rental"
+    }
+  });
+
+  const request = {
+    env:live,
+    crm,
+    headers:headers(live.PUBLIC_ORIGIN),
+    body:lead,
+    lookupProperty:propertyLookup,
+    verify:async()=>true
+  };
+
+  const first = await acceptPublicInquiry(request);
+  const second = await acceptPublicInquiry(request);
+
+  expect(first).toEqual({
+    received:true,
+    message:expect.any(String),
+    nextSteps:{
+      propertyId:"ziegler",
+      showingAvailable:true,
+      showingUrl:
+        "https://calendly.com/altruistic-re/dearborn-heights-rental",
+      bookingRecorded:false
+    }
+  });
+
+  expect(second).toEqual(first);
+  expect(await crm.listContacts()).toHaveLength(1);
+  expect(await crm.listEngagements()).toHaveLength(1);
+  expect((await crm.listEngagements())[0].stage)
+    .toBe("TOUR_OFFERED");
+});
+
+test("general inquiry never receives a tour offer", async () => {
+  const crm = new CRM(new MemoryStore(),"rental-live");
+
+  const result = await acceptPublicInquiry({
+    env:live,
+    crm,
+    headers:headers(live.PUBLIC_ORIGIN),
+    body:{
+      ...lead,
+      interest:"General property question"
+    },
+    lookupProperty:()=>({
+      found:true,
+      property:{
+        available:true,
+        showingUrl:
+          "https://calendly.com/altruistic-re/dearborn-heights-rental"
+      }
+    }),
+    verify:async()=>true
+  });
+
+  expect(result.nextSteps).toBeUndefined();
+  expect((await crm.listEngagements())[0].stage)
+    .toBe("CONTACT_CAPTURED");
+});
+
+test("unsafe scheduling URL is never returned", async () => {
+  const crm = new CRM(new MemoryStore(),"rental-live");
+
+  const result = await acceptPublicInquiry({
+    env:live,
+    crm,
+    headers:headers(live.PUBLIC_ORIGIN),
+    body:lead,
+    lookupProperty:()=>({
+      found:true,
+      property:{
+        available:true,
+        showingUrl:"https://example.com/redirect"
+      }
+    }),
+    verify:async()=>true
+  });
+
+  expect(result.nextSteps).toBeUndefined();
+  expect((await crm.listEngagements())[0].stage)
+    .toBe("TOUR_OFFERED");
 });

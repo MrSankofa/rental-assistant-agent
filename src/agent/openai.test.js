@@ -12,7 +12,18 @@ describe("assistant capability claims", () => {
   });
   test("available opt-in intake is not misrepresented as a staff notification", () => {
     const instructions = buildInstructions({ followUpFormAvailable: true });
-    expect(instructions).toContain('"Request staff follow-up" form');
+    expect(instructions).toContain('"Speak with a human"');
     expect(instructions).toContain("not that someone has already been notified");
   });
+});
+
+test("fictional staging requests minimum contact fields without exposing direct Calendly link",()=>{
+  const guided=buildInstructions({
+    followUpFormAvailable:true,
+    guidedShowingFormAvailable:true
+  });
+  expect(guided).toContain("short contact form before Calendly");
+  expect(guided).toContain("at least one contact method: email or phone");
+  expect(guided).toContain("do not output the showingUrl in the chat");
+  expect(buildInstructions()).toContain("provide the showingUrl");
 });

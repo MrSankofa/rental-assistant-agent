@@ -8,9 +8,12 @@ test("staff service is disabled outside dedicated Cloud Run staging identity",()
 });
 test("dashboard joins contact and engagement and never adds delivery capability",()=>{
  const d=summarizeDashboard([{id:"c1",name:"Fictional Browser",email:"a@example.test",consent:{recording:true}}],
- [{id:"e1",contactId:"c1",targetId:"ziegler",stage:"CONTACT_CAPTURED",nextAction:"Staff review intake"}],
+ [{id:"e1",contactId:"c1",targetId:"ziegler",interest:"Human follow-up",
+   stage:"CONTACT_CAPTURED",nextAction:"Landlord/property manager follow up"}],
  [{id:"task1",engagementId:"e1",status:"pending-approval",summary:"Review",draft:"Hello"}]);
  expect(d.pipeline[0].contact.email).toBe("a@example.test");
+ expect(d.pipeline[0].interest).toBe("Human follow-up");
+ expect(d.pipeline[0].nextAction).toBe("Landlord/property manager follow up");
  expect(d.tasks[0].automatedDelivery).toBe(false);
 });
 

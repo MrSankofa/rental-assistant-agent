@@ -11,7 +11,135 @@ th{font-size:.85rem;color:#536277}button,select,input{font:inherit;padding:9px;b
 button{background:#245bd5;color:white;border:0;cursor:pointer}button:disabled{opacity:.5}
 .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.muted{color:#566579;font-size:.9rem}
 .status{min-height:1.5em}.badge{background:#eaf1ff;border-radius:6px;padding:4px}
+#overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.metric{background:#f7f9fc;border:1px solid #d6dce4;border-radius:9px;padding:15px}
+.metric strong{display:block;font-size:1.7rem;margin-top:8px}
+.filters{display:flex;gap:12px;flex-wrap:wrap;margin:15px 0}
+.filters label{display:flex;flex-direction:column;gap:6px;font-weight:bold}
+details{margin-top:8px}
+details summary{cursor:pointer;color:#245bd5}
+details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.85rem}
 @media(max-width:700px){.scroll{overflow:auto}th,td{min-width:115px}}
+/* Keep milestone controls readable inside the pipeline. */
+.staff-milestone-form{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-width:260px;
+  max-width:360px;
+}
+.staff-milestone-form p{margin:0;font-weight:bold}
+.staff-milestone-form textarea{
+  box-sizing:border-box;
+  width:100%;
+  min-height:90px;
+  padding:10px;
+  font:inherit;
+  border:1px solid #aab5c4;
+  border-radius:6px;
+  resize:vertical;
+}
+.staff-milestone-form label{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  font-size:.9rem;
+  line-height:1.4;
+}
+.staff-milestone-form label input{
+  margin-top:3px;
+}
+.staff-milestone-form button{
+  align-self:flex-start;
+}
+
+.staff-task-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));
+  gap:16px;
+  margin-top:18px;
+}
+.staff-task-card{
+  padding:18px;
+  border:1px solid #d6dce4;
+  border-radius:10px;
+  background:#f8fafc;
+  min-width:0;
+}
+.staff-task-card h3{
+  margin:0 0 12px;
+  font-size:1rem;
+  line-height:1.4;
+}
+.staff-task-card p{margin:8px 0;overflow-wrap:anywhere}
+.staff-task-card form{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:12px;
+  margin-top:16px;
+}
+.staff-task-card textarea{
+  width:100%;
+  min-height:100px;
+  box-sizing:border-box;
+  padding:10px;
+  font:inherit;
+  border:1px solid #aab5c4;
+  border-radius:6px;
+}
+.staff-task-card label{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  line-height:1.4;
+}
+.staff-task-card .action-row{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.staff-task-card button{
+  flex:1 1 140px;
+}
+.staff-task-card button.secondary{
+  background:#4b5563;
+}
+[hidden]{display:none!important}
+
+.staff-prospect-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,450px),1fr));
+  gap:16px;
+  margin-top:16px;
+}
+.staff-prospect-card{
+  padding:18px;
+  border:1px solid #d6dce4;
+  background:#f8fafc;
+  border-radius:10px;
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+.staff-prospect-card h3{margin:0 0 12px}
+.staff-prospect-card p{margin:8px 0}
+.staff-prospect-card .staff-milestone-form{
+  min-width:0;
+  max-width:none;
+  margin-top:16px;
+}
+.staff-prospect-card input:not([type="checkbox"]),
+.staff-prospect-card select{
+  width:100%;
+  box-sizing:border-box;
+  min-width:0;
+}
+.staff-prospect-card textarea{max-width:100%}
+@media(max-width:700px){
+  body{padding:12px}
+  section{padding:14px}
+  .staff-prospect-card{padding:14px}
+}
 </style></head>
 <body><main>
 <header><h1>Rental Assistant | Staff CRM</h1>
@@ -20,12 +148,46 @@ button{background:#245bd5;color:white;border:0;cursor:pointer}button:disabled{op
 <div class="toolbar"><button id="refresh" type="button">Refresh records</button>
 <button id="generate" type="button">Check due follow-ups</button>
 <span id="message" class="status" role="status" aria-live="polite"></span></div></header>
-<section><h2>Prospect pipeline</h2><div class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
-<section><h2>Follow-up review queue</h2><p class="muted">Generate or edit a draft, approve it, then simulate delivery. No real email will be sent.</p>
-<div class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
+<section aria-labelledby="overviewTitle">
+<h2 id="overviewTitle">Rental pipeline overview</h2>
+<div id="overview" aria-live="polite"></div>
+</section>
+<section><h2>Prospect pipeline</h2>
+<div class="filters">
+<label>Property
+<select id="propertyFilter">
+<option value="">All properties</option>
+<option value="ziegler">Dearborn Heights</option>
+<option value="virginia">Detroit</option>
+</select></label>
+<label>Stage
+<select id="stageFilter">
+<option value="">All stages</option>
+</select></label>
+</div>
+<p class="muted" id="filterSummary"></p>
+<div id="prospectCards" class="staff-prospect-grid"></div>
+<div id="legacyPipelineTable" class="scroll"><table><thead><tr><th>Contact</th><th>Property</th><th>Request</th><th>Stage</th><th>Next staff action</th><th>Update</th></tr></thead><tbody id="pipeline"></tbody></table></div></section>
+<section>
+<h2>Tour reminders and outcome reviews</h2>
+<p class="muted">Read-only scheduling preview from verified Calendly bookings. No reminders are sent and no tasks are written by this preview.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>Review</th><th>Due</th><th>Tour starts</th><th>Status</th></tr></thead>
+<tbody id="reminders"></tbody>
+</table>
+</div>
+</section>
+<section><h2>Staff action queue</h2><p class="muted">Review tasks and recorded decisions. Email and SMS delivery remain disabled.</p>
+<div id="staffTaskCards" class="staff-task-grid"></div>
+<div id="legacyTaskTable" class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
 </main><script>
 const q=id=>document.getElementById(id);
 const stamp=x=>x?new Date(x).toLocaleString():"";
+const propertyName=id=>({
+  ziegler:"Dearborn Heights",
+  virginia:"Detroit"
+})[id]||id;
 function cell(row,text){const td=document.createElement("td");td.textContent=String(text??"");row.appendChild(td);return td;}
 async function json(url,options){const r=await fetch(url,{cache:"no-store",...options});const d=await r.json();if(!r.ok)throw Error(d.error||"Request failed");return d;}
 function message(text){q("message").textContent=text;}
@@ -35,17 +197,316 @@ async function reload(){
   const data=await json("/api/staff/dashboard");
   const pipeline=q("pipeline"),tasks=q("tasks");pipeline.replaceChildren();tasks.replaceChildren();
   const live=data.workspace==="live";
+  q("prospectCards").replaceChildren();
+  q("legacyPipelineTable").hidden=live;
+  q("staffTaskCards").replaceChildren();
+  q("legacyTaskTable").hidden=live;
+  const overview=data.overview||{};
+  const tiles=[
+    ["Total prospects",overview.total||0],
+    ["Tours scheduled",overview.scheduled||0],
+    ["Awaiting attention",overview.needsAttention||0],
+    ["Dearborn Heights",overview.byProperty?.ziegler||0],
+    ["Detroit",overview.byProperty?.virginia||0]
+  ];
+  q("overview").replaceChildren();
+  for(const [label,value] of tiles){
+    const tile=document.createElement("div");
+    tile.className="metric";
+    const title=document.createElement("span");
+    title.textContent=label;
+    const number=document.createElement("strong");
+    number.textContent=String(value);
+    tile.append(title,number);
+    q("overview").appendChild(tile);
+  }
+
+  const stageFilter=q("stageFilter");
+  const currentStage=stageFilter.value;
+  stageFilter.replaceChildren(new Option("All stages",""));
+  for(const stage of Object.keys(overview.byStage||{}).sort()){
+    stageFilter.appendChild(new Option(
+      stage.replaceAll("_"," "),stage
+    ));
+  }
+  stageFilter.value=currentStage;
+
+  const filtered=data.pipeline.filter(e=>
+    (!q("propertyFilter").value ||
+      e.property===q("propertyFilter").value) &&
+    (!stageFilter.value || e.stage===stageFilter.value)
+  );
+
+  q("filterSummary").textContent=
+    `Showing ${filtered.length} of ${data.pipeline.length} prospects`;
   q("workspaceDescription").textContent=live?
-    "Private live CRM: real inquiries. Read-only review; email, follow-up generation, and stage changes are disabled until approved.":
+    (data.actionsEnabled===true
+      ? "Private live CRM: authenticated staff may record verified milestones. Automated messages and follow-up delivery remain disabled."
+      : "Private live CRM: read-only review. Staff milestone changes and automated messaging are disabled.") :
     "Private staging workspace. Fictional data only; messaging is simulated.";
   q("newInquiryCount").textContent="New inquiries awaiting staff review: "+(data.attention?.newInquiryCount ?? 0);
   q("generate").hidden=live;
-  for(const e of data.pipeline){
+  for(const e of filtered){
    const tr=document.createElement("tr");
-   cell(tr,e.contact?e.contact.name+" ("+(e.contact.email||e.contact.phone)+")":"Unknown contact");
-   cell(tr,e.property);cell(tr,e.stage);cell(tr,e.nextAction);
+   const contactMethods=e.contact
+     ? [e.contact.email,e.contact.phone].filter(Boolean).join(" | ")
+     : "";
+   const contactCell=cell(tr,e.contact
+     ? e.contact.name+(contactMethods?" ("+contactMethods+")":"")
+     : "Unknown contact");
+
+   const details=document.createElement("details");
+   const summary=document.createElement("summary");
+   summary.textContent="View contact details";
+   const content=document.createElement("pre");
+   const consent=e.contact?.consent;
+   content.textContent=[
+     "Name: "+(e.contact?.name||"Unavailable"),
+     "Email: "+(e.contact?.email||"Unavailable"),
+     "Phone: "+(e.contact?.phone||"Not provided"),
+     "Preferred channel: "+(e.contact?.preferredChannel||"None"),
+     "Recording consent: "+(consent?.recording===true?"Yes":"No"),
+     "Email follow-ups: "+(consent?.email===true?"Opted in":"Not opted in"),
+     "SMS follow-ups: "+(consent?.sms===true?"Opted in":"Not opted in"),
+     "Created: "+stamp(e.createdAt),
+     "Updated: "+stamp(e.updatedAt)
+   ].join("\\n");
+   details.append(summary,content);
+   contactCell.appendChild(details);
+   cell(tr,propertyName(e.property));
+   cell(tr,e.interest||"General inquiry");
+   cell(tr,e.stage);
+   cell(tr,e.nextAction);
    const controls=document.createElement("td");
    const next=e.stage==="CONTACT_CAPTURED"?"TOUR_OFFERED":e.stage==="TOUR_OFFERED"?"TOUR_SCHEDULED":"";
+   if(live && data.actionsEnabled===true){
+    let nextMilestone={
+      TOUR_SCHEDULED:"TOUR_COMPLETED",
+      TOUR_COMPLETED:"APPLICATION_INVITED",
+      APPLICATION_INVITED:"APPLICATION_RECEIVED",
+      APPLICATION_RECEIVED:"UNDER_LANDLORD_REVIEW",
+      UNDER_LANDLORD_REVIEW:"APPROVED",
+      MORE_INFO_REQUESTED:"UNDER_LANDLORD_REVIEW",
+      APPROVED:"RENTREDI_ONBOARDING",
+      RENTREDI_ONBOARDING:"LEASE_SIGNING_SCHEDULED",
+      LEASE_SIGNING_SCHEDULED:"DISCLOSURES_READY_AND_DELIVERED",
+      DISCLOSURES_READY_AND_DELIVERED:"LEASE_SIGNED"
+    }[e.stage];
+
+    if(nextMilestone){
+      const form=document.createElement("form");
+      form.className="staff-milestone-form";
+
+      const title=document.createElement("p");
+      title.textContent="Next milestone: "+nextMilestone.replaceAll("_"," ");
+
+      if(e.stage==="UNDER_LANDLORD_REVIEW"){
+        const decision=document.createElement("select");
+        decision.setAttribute("aria-label","Landlord decision");
+
+        for(const stage of [
+          "APPROVED","DENIED","MORE_INFO_REQUESTED"
+        ]){
+          decision.add(new Option(
+            stage.replaceAll("_"," "),stage
+          ));
+        }
+
+        decision.addEventListener("change",()=>{
+          nextMilestone=decision.value;
+          title.textContent="Next milestone: "+
+            nextMilestone.replaceAll("_"," ");
+        });
+
+        form.appendChild(decision);
+      }
+
+      const evidence=document.createElement("textarea");
+      evidence.required=true;
+      evidence.minLength=10;
+      evidence.maxLength=300;
+      evidence.rows=3;
+      evidence.placeholder="Record verified evidence or staff attestation";
+      evidence.setAttribute("aria-label","Milestone evidence");
+
+      let applicationUrl=null;
+      let deliveryConfirmation=null;
+      let submissionReference=null;
+
+      if(nextMilestone==="APPLICATION_INVITED"){
+        applicationUrl=document.createElement("input");
+        applicationUrl.type="url";
+        applicationUrl.required=true;
+        applicationUrl.maxLength=500;
+        applicationUrl.placeholder="https://provider.example/application";
+        applicationUrl.setAttribute(
+          "aria-label","External application URL"
+        );
+
+        const sentLabel=document.createElement("label");
+        deliveryConfirmation=document.createElement("input");
+        deliveryConfirmation.type="checkbox";
+        deliveryConfirmation.required=true;
+        sentLabel.append(
+          deliveryConfirmation,
+          "I sent the application invitation outside this CRM"
+        );
+
+        form.append(applicationUrl,sentLabel);
+      }
+
+      if(nextMilestone==="APPLICATION_RECEIVED"){
+        submissionReference=document.createElement("input");
+        submissionReference.type="text";
+        submissionReference.required=true;
+        submissionReference.minLength=8;
+        submissionReference.maxLength=100;
+        submissionReference.placeholder="External provider confirmation reference";
+        submissionReference.setAttribute(
+          "aria-label","Application submission reference"
+        );
+        form.appendChild(submissionReference);
+      }
+
+      const handoffStages=[
+        "APPROVED","DENIED","MORE_INFO_REQUESTED",
+        "RENTREDI_ONBOARDING","LEASE_SIGNING_SCHEDULED",
+        "DISCLOSURES_READY_AND_DELIVERED","LEASE_SIGNED"
+      ];
+
+      let externalReference=null;
+      let providerUrl=null;
+      let signingTime=null;
+      let externalConfirmation=null;
+      let decisionConfirmation=null;
+
+      const needsReference=handoffStages.includes(nextMilestone) ||
+        e.stage==="MORE_INFO_REQUESTED" ||
+        e.stage==="UNDER_LANDLORD_REVIEW";
+
+      if(needsReference){
+        externalReference=document.createElement("input");
+        externalReference.type="text";
+        externalReference.required=true;
+        externalReference.minLength=8;
+        externalReference.maxLength=100;
+        externalReference.placeholder="External provider reference (no sensitive data)";
+        externalReference.setAttribute(
+          "aria-label","External provider reference"
+        );
+        form.appendChild(externalReference);
+      }
+
+      if(e.stage==="UNDER_LANDLORD_REVIEW"){
+        const label=document.createElement("label");
+        decisionConfirmation=document.createElement("input");
+        decisionConfirmation.type="checkbox";
+        decisionConfirmation.required=true;
+        label.append(decisionConfirmation,
+          "I recorded the landlord's independent decision");
+        form.appendChild(label);
+      }
+
+      if([
+        "APPROVED","RENTREDI_ONBOARDING",
+        "LEASE_SIGNING_SCHEDULED",
+        "DISCLOSURES_READY_AND_DELIVERED"
+      ].includes(e.stage)){
+        const label=document.createElement("label");
+        externalConfirmation=document.createElement("input");
+        externalConfirmation.type="checkbox";
+        externalConfirmation.required=true;
+        label.append(externalConfirmation,
+          "I verified this milestone with the external provider");
+        form.appendChild(label);
+      }
+
+      if(["APPROVED","RENTREDI_ONBOARDING"].includes(e.stage)){
+        providerUrl=document.createElement("input");
+        providerUrl.type="url";
+        providerUrl.required=true;
+        providerUrl.maxLength=500;
+        providerUrl.placeholder="https://external-provider.example/lease";
+        providerUrl.setAttribute("aria-label","External lease provider URL");
+        form.appendChild(providerUrl);
+      }
+
+      if(e.stage==="RENTREDI_ONBOARDING"){
+        signingTime=document.createElement("input");
+        signingTime.type="datetime-local";
+        signingTime.required=true;
+        signingTime.setAttribute("aria-label","Lease signing appointment");
+        form.appendChild(signingTime);
+      }
+
+      const confirmation=document.createElement("label");
+      const checkbox=document.createElement("input");
+      checkbox.type="checkbox";
+      checkbox.required=true;
+      confirmation.append(checkbox,"I independently verified this milestone");
+
+      const submit=document.createElement("button");
+      submit.type="submit";
+      submit.textContent="Record milestone";
+
+      form.prepend(title);
+      form.append(evidence,confirmation,submit);
+
+      form.addEventListener("submit",async event=>{
+        event.preventDefault();
+        if(!form.reportValidity() || !checkbox.checked)return;
+        if(deliveryConfirmation &&
+           !deliveryConfirmation.checked)return;
+        if(!confirm("Record this verified milestone in the live CRM?"))return;
+
+        submit.disabled=true;
+        try{
+          await json(
+            "/api/staff/engagements/"+
+              encodeURIComponent(e.id)+"/stage",
+            {
+              method:"POST",
+              headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({
+                stage:nextMilestone,
+                evidence:evidence.value,
+                confirmed:true,
+                ...(applicationUrl ? {
+                  applicationUrl:applicationUrl.value,
+                  externalDeliveryConfirmed:deliveryConfirmation.checked
+                } : {}),
+                ...(submissionReference ? {
+                  submissionReference:submissionReference.value
+                } : {}),
+                ...(externalReference ? {
+                  externalReference:externalReference.value
+                } : {}),
+                ...(decisionConfirmation ? {
+                  humanDecisionConfirmed:decisionConfirmation.checked
+                } : {}),
+                ...(externalConfirmation ? {
+                  externalActionConfirmed:externalConfirmation.checked
+                } : {}),
+                ...(providerUrl ? {
+                  providerUrl:providerUrl.value
+                } : {}),
+                ...(signingTime ? {
+                  scheduledAt:new Date(signingTime.value).toISOString()
+                } : {})
+              })
+            }
+          );
+          await reload();
+        }catch(error){
+          message(error.message);
+          submit.disabled=false;
+        }
+      });
+
+      controls.appendChild(form);
+    }
+   }
+
    if(next && !live){
     const action=document.createElement("button");
     action.textContent=next==="TOUR_OFFERED"?"Mark tour offered":"Confirm tour scheduled";
@@ -62,9 +523,226 @@ async function reload(){
     });
     controls.appendChild(action);
    }
+   if(live && data.actionsEnabled!==true){
+     const note=document.createElement("div");
+     note.className="muted";
+     note.textContent="Staff actions awaiting authorization setup";
+     controls.appendChild(note);
+   }
+
+   if(e.application){
+     const details=document.createElement("div");
+     details.className="muted";
+     details.style.marginTop="12px";
+
+     const a=e.application;
+     const records=[
+       "Application: "+(a.status||"unknown"),
+       a.invitedAt?"Invited: "+stamp(a.invitedAt):"",
+       a.receivedAt?"Received: "+stamp(a.receivedAt):"",
+       a.submissionReference?
+         "Provider reference: "+a.submissionReference:"",
+       a.underReviewAt?
+         "Landlord review: "+stamp(a.underReviewAt):""
+     ].filter(Boolean);
+
+     details.textContent=records.join(" | ");
+     controls.appendChild(details);
+
+     if(a.url){
+       const external=document.createElement("a");
+       external.href=a.url;
+       external.textContent="Open external application provider";
+       external.target="_blank";
+       external.rel="noopener noreferrer";
+       controls.appendChild(external);
+     }
+   }
+
+   if(e.handoff){
+     const record=document.createElement("p");
+     record.className="muted";
+     record.textContent=[
+       "Leasing: "+(e.handoff.status||"pending"),
+       e.handoff.decision?
+         "Landlord decision: "+e.handoff.decision.status:"",
+       e.handoff.lease?
+         "Lease handoff: "+e.handoff.lease.status:""
+     ].filter(Boolean).join(" | ");
+     controls.appendChild(record);
+   }
+
+   const updated=document.createElement("div");
+   updated.className="muted";
+   updated.textContent="Updated: "+stamp(e.updatedAt);
+   controls.prepend(updated);
    tr.appendChild(controls);pipeline.appendChild(tr);
+
+   if(live){
+     const card=document.createElement("article");
+     card.className="staff-prospect-card";
+
+     const heading=document.createElement("h3");
+     heading.textContent=e.contact?.name||"Unknown prospect";
+
+     const description=document.createElement("p");
+     description.textContent=
+       propertyName(e.property)+" | "+e.stage.replaceAll("_"," ");
+
+     const request=document.createElement("p");
+     request.textContent=e.interest||"Rental inquiry";
+
+     const cardControls=document.createElement("div");
+     cardControls.className="staff-prospect-controls";
+     while(controls.firstChild){
+       cardControls.appendChild(controls.firstChild);
+     }
+
+     card.append(heading,description,request,details);
+     card.appendChild(cardControls);
+     q("prospectCards").appendChild(card);
+   }
   }
-  for(const t of data.tasks){
+  const reminderRows=q("reminders");
+   reminderRows.replaceChildren();
+
+   for(const reminder of data.reminders||[]){
+     const row=document.createElement("tr");
+     cell(row,reminder.summary);
+     cell(row,stamp(reminder.dueAt));
+     cell(row,stamp(reminder.startsAt));
+     cell(row,reminder.status);
+     reminderRows.appendChild(row);
+   }
+
+   if(!reminderRows.children.length){
+     const row=document.createElement("tr");
+     const td=document.createElement("td");
+     td.colSpan=4;
+     td.textContent="No tour reviews due or upcoming in the planning window";
+     row.appendChild(td);
+     reminderRows.appendChild(row);
+   }
+
+   if(live){
+     const cards=q("staffTaskCards");
+
+     for(const t of data.tasks){
+       const card=document.createElement("article");
+       card.className="staff-task-card";
+
+       const title=document.createElement("h3");
+       title.textContent=t.summary||"Staff review task";
+
+       const due=document.createElement("p");
+       due.textContent="Due: "+stamp(t.dueAt);
+
+       const status=document.createElement("p");
+       status.textContent="Status: "+t.status;
+
+       const delivery=document.createElement("p");
+       delivery.className="muted";
+       delivery.textContent="Delivery: disabled";
+
+       card.append(title,due,status,delivery);
+
+       if(t.staffResolution){
+         const resolution=document.createElement("p");
+         resolution.className="muted";
+         resolution.textContent=
+           "Decision: "+t.staffResolution.action+
+           " | "+t.staffResolution.reason+
+           " | "+stamp(t.staffResolution.at);
+         card.appendChild(resolution);
+       }
+
+       if(data.reminderStaffActionsEnabled===true &&
+          t.source==="tour-reminder-planner" &&
+          t.status==="pending-approval"){
+
+         const form=document.createElement("form");
+         form.className="staff-reminder-decision";
+
+         const reason=document.createElement("textarea");
+         reason.required=true;
+         reason.minLength=10;
+         reason.maxLength=300;
+         reason.placeholder="Document your decision (10-300 characters)";
+         reason.setAttribute("aria-label","Reminder decision reason");
+
+         const label=document.createElement("label");
+         const checkbox=document.createElement("input");
+         checkbox.type="checkbox";
+         checkbox.required=true;
+         label.append(checkbox,"I reviewed this reminder");
+
+         const actions=document.createElement("div");
+         actions.className="action-row";
+
+         const complete=document.createElement("button");
+         complete.type="button";
+         complete.textContent="Complete review";
+
+         const dismiss=document.createElement("button");
+         dismiss.type="button";
+         dismiss.className="secondary";
+         dismiss.textContent="Dismiss reminder";
+
+         async function decide(action){
+           if(!reason.reportValidity())return;
+           if(!checkbox.checked){
+             message("Confirm that you reviewed this reminder");
+             return;
+           }
+
+           if(!confirm("Record this "+action+" decision in the live CRM?"))
+             return;
+
+           complete.disabled=true;
+           dismiss.disabled=true;
+
+           try{
+             await json(
+               "/api/staff/reminders/"+
+               encodeURIComponent(t.id)+"/decision",
+               {
+                 method:"POST",
+                 headers:{"Content-Type":"application/json"},
+                 body:JSON.stringify({
+                   action,
+                   reason:reason.value,
+                   confirmed:true
+                 })
+               }
+             );
+             await reload();
+           }catch(error){
+             message(error.message);
+             complete.disabled=false;
+             dismiss.disabled=false;
+           }
+         }
+
+         complete.addEventListener("click",()=>decide("complete"));
+         dismiss.addEventListener("click",()=>decide("dismiss"));
+
+         actions.append(complete,dismiss);
+         form.append(reason,label,actions);
+         card.appendChild(form);
+       }
+
+       cards.appendChild(card);
+     }
+
+     if(!data.tasks.length){
+       const empty=document.createElement("p");
+       empty.className="muted";
+       empty.textContent="No persistent staff tasks yet";
+       cards.appendChild(empty);
+     }
+   }
+
+   for(const t of (live?[]:data.tasks)){
    const tr=document.createElement("tr");
    cell(tr,t.summary);cell(tr,stamp(t.dueAt));cell(tr,t.status);
    const draftCell=document.createElement("td");
@@ -72,8 +750,8 @@ async function reload(){
    editor.value=t.draft||"";
    editor.rows=4;editor.maxLength=1000;editor.style.width="100%";
    editor.style.minWidth="240px";
-   editor.disabled=t.status!=="pending-approval";
-   editor.setAttribute("aria-label","Follow-up email draft");
+   editor.disabled=live || t.status!=="pending-approval";
+   editor.setAttribute("aria-label","Task draft, not sent");
    draftCell.appendChild(editor);
    const origin=document.createElement("div");
    origin.className="muted";
@@ -97,9 +775,80 @@ async function reload(){
      });
      controls.appendChild(b);
    };
-   if(live){
+   if(live && data.reminderStaffActionsEnabled===true &&
+      t.source==="tour-reminder-planner" &&
+      t.status==="pending-approval"){
+
+     const form=document.createElement("form");
+     form.className="staff-reminder-decision";
+
+     const reason=document.createElement("textarea");
+     reason.required=true;
+     reason.minLength=10;
+     reason.maxLength=300;
+     reason.rows=3;
+     reason.placeholder="Document your decision (10-300 characters)";
+     reason.setAttribute("aria-label","Reminder decision reason");
+
+     const confirmation=document.createElement("label");
+     const checkbox=document.createElement("input");
+     checkbox.type="checkbox";
+     checkbox.required=true;
+     confirmation.append(checkbox,"I reviewed this reminder");
+
+     const complete=document.createElement("button");
+     complete.type="button";
+     complete.textContent="Complete review";
+
+     const dismiss=document.createElement("button");
+     dismiss.type="button";
+     dismiss.textContent="Dismiss reminder";
+
+     async function decide(action){
+       if(!checkbox.checked || !reason.checkValidity()){
+         reason.reportValidity();
+         if(!checkbox.checked)message("Confirm reminder review");
+         return;
+       }
+
+       if(!confirm("Record this "+action+" decision in the live CRM?"))
+         return;
+
+       complete.disabled=true;
+       dismiss.disabled=true;
+
+       try{
+         await json(
+           "/api/staff/reminders/"+
+             encodeURIComponent(t.id)+"/decision",
+           {
+             method:"POST",
+             headers:{"Content-Type":"application/json"},
+             body:JSON.stringify({
+               action,
+               reason:reason.value,
+               confirmed:true
+             })
+           }
+         );
+         await reload();
+       }catch(error){
+         message(error.message);
+         complete.disabled=false;
+         dismiss.disabled=false;
+       }
+     }
+
+     complete.addEventListener("click",()=>decide("complete"));
+     dismiss.addEventListener("click",()=>decide("dismiss"));
+
+     form.append(reason,confirmation,complete,dismiss);
+     controls.appendChild(form);
+
+   }else if(live){
      const info=document.createElement("span");info.className="muted";
-     info.textContent="Live actions disabled. Review manually."; controls.appendChild(info);
+     info.textContent="No live task action available.";
+     controls.appendChild(info);
    }else if(t.status==="pending-approval"){
      actionButton("Generate AI draft","generate-draft");
      actionButton("Save edited draft","edit-draft",()=>({draft:editor.value}));
@@ -116,12 +865,14 @@ async function reload(){
    td.appendChild(controls);
    tr.appendChild(td);tasks.appendChild(tr);
   }
-  if(!data.pipeline.length) pipeline.appendChild(Object.assign(document.createElement("tr"),{textContent:"No engagements"}));
-  if(!data.tasks.length) tasks.appendChild(Object.assign(document.createElement("tr"),{textContent:"No follow-up tasks yet"}));
-  message("Loaded "+data.pipeline.length+" engagements and "+data.tasks.length+" tasks");
+  if(!filtered.length) pipeline.appendChild(Object.assign(document.createElement("tr"),{textContent:"No engagements"}));
+  if(!data.tasks.length) tasks.appendChild(Object.assign(document.createElement("tr"),{textContent:"No persistent staff tasks yet"}));
+  message("Loaded "+data.pipeline.length+" engagements; showing "+filtered.length+" filtered records");
  }catch(e){message("Unable to load CRM: "+e.message);}
 }
 q("refresh").addEventListener("click",reload);
+q("propertyFilter").addEventListener("change",reload);
+q("stageFilter").addEventListener("change",reload);
 q("generate").addEventListener("click",async()=>{try{
  const r=await json("/api/staff/followups/run",{method:"POST"});
  await reload();message("Follow-up check complete. "+r.created+" new tasks; "+r.alreadyExists+" already queued.");

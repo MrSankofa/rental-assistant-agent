@@ -2,12 +2,20 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { requestPath } = require("./src/http/requestPath");
+const { verifyIapIdentity } = require("./src/http/iapIdentity");
+const { handleCalendlyWebhook } = require("./src/http/calendlyWebhookRoute");
 const { askAI } = require("./src/agent/openai");
 
 
+const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
+const { featureEnabled: reminderStaffEnabled, decideReminder } =
+  require("./src/crm/staffReminderActions");
 const { makeStore } = require("./src/crm/storage");
 const { CRM } = require("./src/crm/workflows");
 const { generateFollowupTasks } = require("./src/crm/followups");
+const { planTourReminders } = require("./src/crm/tourReminderPlanner");
+const { overlayReminderStatus } =
+  require("./src/crm/reminderPresentation");
 const { prepareDraft, editDraft, approveAndSend, deliveryMode } = require("./src/crm/messaging");
 const { staffEnabled, liveStaffEnabled, legacyAdminEnabled, summarizeDashboard } = require("./src/crm/staff");
 const { stagingIntakeEnabled, requireStagingOrigin, validateFictionalIntake } = require("./src/crm/stagingIntake");
@@ -67,6 +75,19 @@ function sendJson(res, status, data) {
 
 const server = http.createServer(async (req, res) => {
   const pathname = requestPath(req.url);
+
+  // Calendly integration is staging-only and read-only at this phase.
+  if (req.method === "POST" &&
+      pathname === "/api/integrations/calendly/webhook") {
+    const outcome = await handleCalendlyWebhook({
+      req,
+      crm,
+      env: process.env
+    });
+
+    sendJson(res, outcome.statusCode, outcome.body);
+    return;
+  }
 
   // Health check for Cloud Run.
   if (req.method === "GET" && pathname === "/healthz") {
@@ -144,16 +165,122 @@ const server = http.createServer(async (req, res) => {
       fs.createReadStream(path.join(__dirname,"public","staff.html")).pipe(res);
       return;
     }
+    if (req.method === "GET" && pathname === "/api/staff/identity") {
+      if (!liveStaffMode) {
+        sendJson(res,404,{error:"Not found"});
+        return;
+      }
+
+      try {
+        const staff=await verifyIapIdentity(
+          req.headers["x-goog-iap-jwt-assertion"],
+          {allowedEmails:process.env.CRM_STAFF_ALLOWED_EMAILS}
+        );
+
+        sendJson(res,200,{
+          verified:true,
+          email:staff.email
+        });
+      } catch (_) {
+        sendJson(res,403,{
+          verified:false,
+          error:"Verified staff identity required"
+        });
+      }
+      return;
+    }
     if (req.method === "GET" && pathname === "/api/staff/dashboard") {
       try {
-        sendJson(res,200,summarizeDashboard(
-          await crm.listContacts(), await crm.listEngagements(), await crm.listTasks(),
-          {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging"}));
+        const contacts = await crm.listContacts();
+        const engagements = await crm.listEngagements();
+        const tasks = await crm.listTasks();
+        const dashboard = summarizeDashboard(
+          contacts, engagements, tasks,
+          {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging",actionsEnabled:liveStaffMode&&actionsEnabled(process.env)});
+        dashboard.reminderStaffActionsEnabled =
+          liveStaffMode && reminderStaffEnabled(process.env);
+        dashboard.reminders = liveStaffMode
+          ? overlayReminderStatus(
+              planTourReminders(
+                engagements, await crm.store.list("bookings"),
+                {now:new Date()}
+              ),
+              tasks
+            )
+          : [];
+        sendJson(res,200,dashboard);
       } catch(e) { sendJson(res,500,{error:"Unable to load staff dashboard"}); }
       return;
     }
-    // Live records are read-only until a separate authenticated staff workflow is approved.
-    if (liveStaffMode) { sendJson(res,403,{error:"Live staff actions not yet enabled"}); return; }
+    // Live actions remain disabled unless explicitly released on the private service.
+    if (liveStaffMode) {
+      const reminderPath = pathname.match(
+        /^\/api\/staff\/reminders\/(tr_[0-9a-f]{40})\/decision$/
+      );
+      const stagePath = pathname.match(
+        /^\/api\/staff\/engagements\/([a-zA-Z0-9_-]+)\/stage$/
+      );
+      const reminderRequest = Boolean(
+        reminderPath && reminderStaffEnabled(process.env)
+      );
+      const milestoneRequest = Boolean(
+        stagePath && actionsEnabled(process.env)
+      );
+      if (req.method !== "POST" ||
+          (!reminderRequest && !milestoneRequest)) {
+        sendJson(res,403,{error:"Live staff actions disabled"});
+        return;
+      }
+
+      // Require an actual same-origin browser request. Cloud Run IAM
+      // remains the authentication perimeter, not a browser cookie.
+      const origin=req.headers.origin||"";
+      const host=req.headers.host||"";
+      if (!host.endsWith(".run.app") ||
+          !origin || origin !== "https://"+host) {
+        sendJson(res,403,{error:"Origin not allowed"});
+        return;
+      }
+
+      let verifiedStaff;
+      try {
+        verifiedStaff=await verifyIapIdentity(
+          req.headers["x-goog-iap-jwt-assertion"],
+          {allowedEmails:process.env.CRM_STAFF_ALLOWED_EMAILS}
+        );
+      } catch {
+        sendJson(res,403,{error:"Verified staff identity required"});
+        return;
+      }
+
+      const body=await readJsonBody(req,res,4096);
+      if (!body) return;
+
+      try {
+        if (reminderRequest) {
+          const result=await decideReminder(
+            crm,reminderPath[1],body,verifiedStaff.actor
+          );
+          sendJson(res,200,result);
+          return;
+        }
+
+        const current=await crm.history(stagePath[1]);
+        const milestone=validateMilestone(current,body);
+        const result=await crm.transition(
+          stagePath[1],milestone,verifiedStaff.actor
+        );
+        sendJson(res,200,{
+          id:result.id,stage:result.stage,
+          updatedAt:result.updatedAt
+        });
+      } catch(error) {
+        sendJson(res,error.status||500,{
+          error:error.status?error.message:"Staff update unavailable"
+        });
+      }
+      return;
+    }
     // Mutating actions require an explicit same-origin request and no proxy-based bearer bypass.
     // Cloud Run IAM is the authentication perimeter of this private staff service.
     if (req.method === "POST" && !requireStagingOrigin(req.headers.origin,allowedOrigin)) {
@@ -314,7 +441,8 @@ const server = http.createServer(async (req, res) => {
       const result = await askAI(
         data.message.trim(),
         previousResponseId,
-        { followUpFormAvailable: publicIntakeStatus.publicIntakeEnabled }
+        { followUpFormAvailable: publicIntakeStatus.publicIntakeEnabled,
+          guidedShowingFormAvailable: publicIntakeStatus.stagingTestMode }
       );
 
       sendJson(res, 200, result);

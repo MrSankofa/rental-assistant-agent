@@ -38,14 +38,30 @@ describe("real rental intake launch guards",()=>{
    source:"rental-assistant-live-form",
    consent:{recording:true,email:false,sms:false}
   });
+
+  expect(validateRealRentalIntake({
+   ...valid,email:"",phone:"+13135550100",preferredChannel:"none"
+  },property)).toMatchObject({
+   email:"",
+   phone:"+13135550100",
+   preferredChannel:"none"
+  });
+
+  expect(validateRealRentalIntake({
+   ...valid,interest:"Human follow-up"
+  },property)).toMatchObject({
+   interest:"Human follow-up"
+  });
   for(const bad of [
    {...valid,targetId:"virginia"},
    {...valid,consent:{recording:false,email:false,sms:false}},
    {...valid,consent:{recording:true,email:false,sms:true}},
    {...valid,name:""},
    {...valid,email:"bad"},
-   {...valid,preferredChannel:"sms"},
-   {...valid,phone:"+13135550100"},
+   {...valid,email:"",phone:""},
+   {...valid,email:"",phone:"12345"},
+   {...valid,email:"",phone:"+13135550100",
+     consent:{recording:true,email:true,sms:false}},
    {...valid,interest:"Custom text"}
   ])expect(()=>validateRealRentalIntake(bad,property)).toThrow("Invalid rental inquiry");
   expect(()=>validateRealRentalIntake(valid,()=>({found:true,property:{available:false}})))

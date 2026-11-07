@@ -3,7 +3,7 @@ test("no key returns labeled template, never pretends AI generated it", async()=
  const d = await createDraft({targetId:"ziegler",stage:"CONTACT_CAPTURED"},
  {enabled:false,apiKey:""});
  expect(d.origin).toBe("template");
- expect(d.body).toContain("Ziegler");
+ expect(d.body).toContain("Dearborn Heights rental");
 });
 test("AI sees only property and stage, not prospect identifying data", async()=>{
  let req;

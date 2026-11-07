@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.properties = void 0;
 exports.properties = {
     virginia: {
-        name: "Virginia",
+        name: "Detroit rental",
         address: "Virginia Park St",
         city: "Detroit",
         state: "MI",
@@ -20,7 +20,7 @@ exports.properties = {
         showingUrl: "",
     },
     ziegler: {
-        name: "Ziegler",
+        name: "Dearborn Heights rental",
         address: "4932 Ziegler St",
         city: "Dearborn Heights",
         state: "MI",
@@ -34,6 +34,6 @@ exports.properties = {
         leaseTerm: "12 months",
         applicationUrl: "https://www.zillow.com/homedetails/4932-Ziegler-St-Dearborn-Heights-MI-48125/88094499_zpid/?view=public",
         applicationAvailableFrom: "2026-10-24",
-        showingUrl: "https://calendly.com/altruistic-re/ziegler-house-showing",
+        showingUrl: "https://calendly.com/altruistic-re/dearborn-heights-rental",
     },
 };

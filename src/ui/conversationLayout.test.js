@@ -13,7 +13,8 @@ test("followup form lives in transcript and stays hidden until requested",()=>{
  expect(html).toContain("messages.appendChild(contactIntakeTurn)");
  expect(html).toContain('contactIntakeTurn.hidden = false');
  expect(html).toContain('contactIntake.hidden = false');
- expect(html).toContain('followUpJump.hidden = false');
+ expect(html).toContain('scheduleTourJump.hidden = false');
+ expect(html).toContain('humanHelpJump.hidden = false');
  expect(html).toContain('contactIntake.hidden = true');
  expect(html).toContain('contactIntakeTurn.hidden = true');
  expect(html).toContain("messages.appendChild(showingNextTurn)");
@@ -22,8 +23,8 @@ test("real inquiries keep explicit consent, verification and privacy controls",(
  for(const item of ["name=\"recording\" required","name=\"emailConsent\"",
   'id="humanVerification"','id="privacyLink"',"turnstile.getResponse","turnstileToken"])
   expect(html).toContain(item);
- expect(html).toContain('name="phone" type="hidden" value=""');
- expect(html).toContain('name="preferredChannel" type="hidden" value="email"');
+ expect(html).toContain('name="phone" type="tel"');
+ expect(html).toContain('Please provide an email address or phone number.');
  expect(html).toMatch(/\[hidden\] \{ display: none !important; \}/);
 });
 
@@ -40,4 +41,23 @@ test("thinking dots appear during request and are removed on success or failure"
  expect(html).toContain('bubble.setAttribute("role", "status")');
  expect(html).toContain("prefers-reduced-motion: reduce");
  expect(html).toContain("animation: typing-pulse");
+});
+
+test("showing interest opens minimal first-and-last-name intake before link",()=>{
+  expect(html).toContain('name="firstName"');
+  expect(html).toContain('name="lastName"');
+  expect(html).toContain('name="email" type="email"');
+  expect(html).toContain('name="phone" type="tel"');
+  expect(html).toContain('Provide at least one contact method: email or phone.');
+  expect(html).toContain('id="inquiryExtraFields"');
+  expect(html).toContain('function openLeadForm(mode)');
+  expect(html).toContain('openLeadForm("showing")');
+  expect(html).toContain('openLeadForm("human")');
+  expect(html).toContain('propertySelect.value = "ziegler"');
+  expect(html).toContain('showing ? "Tour inquiry" : "Human follow-up"');
+  expect(html).toContain('showing ? "Continue to showing times"');
+  expect(html).toContain('String(values.get("firstName") || "").trim()');
+  expect(html).toContain('String(values.get("lastName") || "").trim()');
+  expect(html).toContain('Phone-only inquiries may require staff review');
+  expect(html).toContain('bookingRecorded === false');
 });
