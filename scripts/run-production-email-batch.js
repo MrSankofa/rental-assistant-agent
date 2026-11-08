@@ -42,7 +42,7 @@ async function run({
   if(tasks.length>=SCAN_LIMIT)
     throw Error("Production email task scan incomplete: stop before sending");
 
-  const candidates=tasks.filter(t=>
+  const allCandidates=tasks.filter(t=>
     t?.status==="ready-for-automatic-delivery" &&
     t?.routing==="autonomous" &&
     t?.source==="scheduler" &&
@@ -51,7 +51,8 @@ async function run({
   ).sort((a,b)=>
     String(a.dueAt||"").localeCompare(String(b.dueAt||"")) ||
     a.id.localeCompare(b.id)
-  ).slice(0,Number(env.CRM_PRODUCTION_BATCH_LIMIT));
+  );
+  const candidates=allCandidates.slice(0,Number(env.CRM_PRODUCTION_BATCH_LIMIT));
 
   // Explicit one-task live test: refuse to switch to another prospect.
   // Normal scheduled runs omit both test-only variables.
@@ -63,6 +64,7 @@ async function run({
        typeof fixtureMarker!=="string" ||
        !/^phase14-e2e-[a-f0-9]{32}$/.test(fixtureMarker) ||
        env.CRM_PRODUCTION_BATCH_LIMIT!=="1" ||
+       allCandidates.length!==1 ||
        candidates.length!==1 ||
        candidates[0].id!==fixtureTaskId)
       throw Error("Controlled test task gate rejected");
