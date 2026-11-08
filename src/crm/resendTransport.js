@@ -2,7 +2,7 @@
 // Resend adapter is deliberately NOT wired into any production or staging job.
 // A separate future deployment approval must enable live delivery after domain verification.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function validateMessage({from,to,subject,text,idempotencyKey}) {
+function validateMessage({from,to,subject,text,idempotencyKey,headers}) {
   if (typeof from !== "string" || !/^Rental Assistant <rentals@altruisticdevelopment\.com>$/.test(from) ||
       typeof to !== "string" || !EMAIL.test(to) ||
       typeof subject !== "string" || !subject.trim() || subject.length > 150 ||
@@ -10,6 +10,12 @@ function validateMessage({from,to,subject,text,idempotencyKey}) {
       typeof idempotencyKey !== "string" || !/^[a-zA-Z0-9_-]{8,120}$/.test(idempotencyKey)) {
     throw Error("Invalid outbound email request");
   }
+  if(headers!==undefined &&
+     (!headers || typeof headers!=="object" ||
+      !/^<https:\/\/[^\\s<>]+>$/.test(headers["List-Unsubscribe"]||"") ||
+      headers["List-Unsubscribe-Post"]!=="List-Unsubscribe=One-Click" ||
+      Object.keys(headers).length!==2))
+    throw Error("Invalid unsubscribe headers");
 }
 async function sendResendEmail(message,{apiKey,fetchFn=globalThis.fetch}={}) {
   validateMessage(message);
@@ -26,6 +32,7 @@ async function sendResendEmail(message,{apiKey,fetchFn=globalThis.fetch}={}) {
     },
     body:JSON.stringify({
       from:message.from,to:[message.to],subject:message.subject,text:message.text,
+      ...(message.headers?{headers:message.headers}:{}),
       reply_to:"rentals@altruisticdevelopment.com"
     })
   });
