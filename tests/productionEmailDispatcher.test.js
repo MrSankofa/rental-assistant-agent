@@ -53,6 +53,32 @@ describe("Phase 13 injected-transport production dispatcher",()=>{
     expect(transport).toHaveBeenCalledTimes(1);
   });
 
+  test("configured outbound email includes signed opt-out link and provider headers",async()=>{
+    const f=await fixture();
+    f.env.CRM_UNSUBSCRIBE_ORIGIN="https://rental-unsubscribe-live-951837038410.us-east5.run.app";
+    f.env.CRM_UNSUBSCRIBE_SIGNING_SECRET="a".repeat(64);
+    const transport=jest.fn(async msg=>{
+      expect(msg.text).toContain("To stop automated rental follow-up emails");
+      expect(msg.headers["List-Unsubscribe"]).toMatch(/^<https:\/\/rental-unsubscribe-live-/);
+      expect(msg.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+      return {status:"accepted",providerId:"mock-optout-001"};
+    });
+    expect((await deliverAuthorizedProductionEmail(f.crm,f.task.id,{
+      env:f.env,now:f.now,transport
+    })).outcome).toBe("accepted");
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  test("incomplete unsubscribe configuration blocks provider call",async()=>{
+    const f=await fixture();
+    f.env.CRM_UNSUBSCRIBE_ORIGIN="https://rental-unsubscribe-live-951837038410.us-east5.run.app";
+    const transport=jest.fn();
+    const outcome=await deliverAuthorizedProductionEmail(f.crm,f.task.id,{
+      env:f.env,now:f.now,transport
+    });
+    expect(outcome.outcome).toBe("needs-reconciliation");
+    expect(transport).not.toHaveBeenCalled();
+  });
   test("production disabled never claims or invokes provider",async()=>{
     const f=await fixture();
     f.env.CRM_DELIVERY_MODE="disabled";
