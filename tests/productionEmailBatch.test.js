@@ -112,7 +112,7 @@ describe("Phase 13 bounded production email job entrypoint",()=>{
       CRM_PRODUCTION_TEST_TASK_ID:f.task.id,CRM_PRODUCTION_TEST_MARKER:marker};
     const anotherId="fu_"+"b".repeat(40);
     await f.crm.store.create("tasks",anotherId,{
-      ...f.task,id:anotherId,dueAt:"2020-01-01T00:00:00.000Z"
+      ...f.task,id:anotherId,dueAt:"2099-01-01T00:00:00.000Z"
     });
     const deliver=jest.fn();
     await expect(run({env:e,makeCrm:()=>f.crm,deliver,now:f.now}))
