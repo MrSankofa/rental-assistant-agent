@@ -53,6 +53,30 @@ async function run({
     a.id.localeCompare(b.id)
   ).slice(0,Number(env.CRM_PRODUCTION_BATCH_LIMIT));
 
+  // Explicit one-task live test: refuse to switch to another prospect.
+  // Normal scheduled runs omit both test-only variables.
+  const fixtureTaskId=env.CRM_PRODUCTION_TEST_TASK_ID;
+  const fixtureMarker=env.CRM_PRODUCTION_TEST_MARKER;
+  if(fixtureTaskId!==undefined || fixtureMarker!==undefined) {
+    if(typeof fixtureTaskId!=="string" ||
+       !/^fu_[a-f0-9]{40}$/.test(fixtureTaskId) ||
+       typeof fixtureMarker!=="string" ||
+       !/^phase14-e2e-[a-f0-9]{32}$/.test(fixtureMarker) ||
+       env.CRM_PRODUCTION_BATCH_LIMIT!=="1" ||
+       candidates.length!==1 ||
+       candidates[0].id!==fixtureTaskId)
+      throw Error("Controlled test task gate rejected");
+    const engagementRow=await crm.store.get("engagements",candidates[0].engagementId);
+    const contactRow=engagementRow
+      ? await crm.store.get("contacts",engagementRow.value.contactId) : null;
+    if(!engagementRow || !contactRow ||
+       engagementRow.value.testFixture!==fixtureMarker ||
+       contactRow.value.testFixture!==fixtureMarker ||
+       contactRow.value.email!=="delivered@resend.dev" ||
+       contactRow.value.id!==engagementRow.value.contactId)
+      throw Error("Controlled test fixture mismatch");
+  }
+
   const results={inspected:tasks.length,selected:candidates.length,
     accepted:0,skipped:0,staffReview:0,needsReconciliation:0};
   for(const task of candidates) {
