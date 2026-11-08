@@ -66,6 +66,60 @@ describe("Phase 13 bounded production email job entrypoint",()=>{
       {env:env(),now:f.now});
   });
 
+  test("test-only guard permits exactly the marked synthetic recipient",async()=>{
+    const f=await fixture();
+    const marker="phase14-e2e-"+"a".repeat(32);
+    const engagement=(await f.crm.store.get("engagements",f.task.engagementId));
+    const contact=(await f.crm.store.get("contacts",engagement.value.contactId));
+    await f.crm.store.replace("engagements",f.task.engagementId,
+      {...engagement.value,testFixture:marker},engagement.version);
+    await f.crm.store.replace("contacts",engagement.value.contactId,
+      {...contact.value,email:"delivered@resend.dev",testFixture:marker},contact.version);
+    const e={...env(),CRM_PRODUCTION_BATCH_LIMIT:"1",
+      CRM_PRODUCTION_TEST_TASK_ID:f.task.id,CRM_PRODUCTION_TEST_MARKER:marker};
+    const deliver=jest.fn(async()=>({outcome:"accepted"}));
+    const result=await run({env:e,makeCrm:()=>f.crm,deliver,now:f.now});
+    expect(result.accepted).toBe(1);
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(["wrong-task","wrong-marker","wrong-recipient","missing-marker"])(
+    "test-only guard refuses %s before transport",async(mode)=>{
+      const f=await fixture();
+      const marker="phase14-e2e-"+"a".repeat(32);
+      const engagement=(await f.crm.store.get("engagements",f.task.engagementId));
+      const contact=(await f.crm.store.get("contacts",engagement.value.contactId));
+      await f.crm.store.replace("engagements",f.task.engagementId,
+        {...engagement.value,testFixture:marker},engagement.version);
+      await f.crm.store.replace("contacts",engagement.value.contactId,
+        {...contact.value,email:mode==="wrong-recipient"?"real@example.com":"delivered@resend.dev",
+          testFixture:mode==="missing-marker"?undefined:marker},contact.version);
+      const e={...env(),CRM_PRODUCTION_BATCH_LIMIT:"1",
+        CRM_PRODUCTION_TEST_TASK_ID:mode==="wrong-task"?"fu_"+"0".repeat(40):f.task.id,
+        CRM_PRODUCTION_TEST_MARKER:mode==="wrong-marker"?
+          "phase14-e2e-"+"b".repeat(32):marker};
+      const deliver=jest.fn();
+      await expect(run({env:e,makeCrm:()=>f.crm,deliver,now:f.now}))
+        .rejects.toThrow("Controlled test");
+      expect(deliver).not.toHaveBeenCalled();
+    }
+  );
+
+  test("test-only guard rejects additional eligible prospects before dispatch",async()=>{
+    const f=await fixture();
+    const marker="phase14-e2e-"+"a".repeat(32);
+    const e={...env(),CRM_PRODUCTION_BATCH_LIMIT:"1",
+      CRM_PRODUCTION_TEST_TASK_ID:f.task.id,CRM_PRODUCTION_TEST_MARKER:marker};
+    const anotherId="fu_"+"b".repeat(40);
+    await f.crm.store.create("tasks",anotherId,{
+      ...f.task,id:anotherId,dueAt:"2020-01-01T00:00:00.000Z"
+    });
+    const deliver=jest.fn();
+    await expect(run({env:e,makeCrm:()=>f.crm,deliver,now:f.now}))
+      .rejects.toThrow("Controlled test");
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
   test("incomplete 200-row scan aborts before any dispatch",async()=>{
     const f=await fixture();
     for(let i=1;i<SCAN_LIMIT;i++){
