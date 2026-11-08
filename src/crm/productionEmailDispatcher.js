@@ -3,6 +3,7 @@
 // An operator must separately approve and implement an entrypoint before live send.
 const {FROM}=require("./deliveryOutbox");
 const {validateMessage}=require("./resendTransport");
+const {unsubscribeUrl}=require("./unsubscribe");
 const {
   reserveProductionEmail,checkProductionReservation,
   finalizeProductionReservation,cancelProductionReservation
@@ -57,6 +58,12 @@ async function deliverAuthorizedProductionEmail(crm,taskId,{
       subject:"Rental Assistant follow-up",
       text:task.draft,idempotencyKey:claim.idempotencyKey
     };
+    if(env.CRM_UNSUBSCRIBE_ORIGIN || env.CRM_UNSUBSCRIBE_SIGNING_SECRET) {
+      const url=unsubscribeUrl(contact.id,env);
+      message.text+="\n\nTo stop automated rental follow-up emails, visit: "+url;
+      message.headers={"List-Unsubscribe":"<"+url+">",
+        "List-Unsubscribe-Post":"List-Unsubscribe=One-Click"};
+    }
     validateMessage(message);
   } catch(_) {
     // No request was attempted. Keep reservation locked for investigation.
