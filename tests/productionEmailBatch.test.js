@@ -9,7 +9,9 @@ const {run,validate,EXECUTION_APPROVAL,SCAN_LIMIT}=
 const env=()=>({
   ...RELEASE,
   CRM_PRODUCTION_SEND_EXECUTION_APPROVAL:EXECUTION_APPROVAL,
-  CRM_PRODUCTION_BATCH_LIMIT:"2"
+  CRM_PRODUCTION_BATCH_LIMIT:"2",
+  CRM_UNSUBSCRIBE_ORIGIN:"https://rental-unsubscribe-live-951837038410.us-east5.run.app",
+  CRM_UNSUBSCRIBE_SIGNING_SECRET:"a".repeat(64)
 });
 async function fixture() {
   const store=new MemoryStore();
@@ -42,6 +44,13 @@ describe("Phase 13 bounded production email job entrypoint",()=>{
         .toThrow("batch limit");
     }
   );
+
+  test("missing unsubscribe configuration blocks CRM initialization",async()=>{
+    const e=env(); delete e.CRM_UNSUBSCRIBE_SIGNING_SECRET;
+    const makeCrm=jest.fn();
+    await expect(run({env:e,makeCrm})).rejects.toThrow("signing secret invalid");
+    expect(makeCrm).not.toHaveBeenCalled();
+  });
 
   test("disabled environment cannot even construct a database store",async()=>{
     const makeCrm=jest.fn();
