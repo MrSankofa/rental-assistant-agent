@@ -90,7 +90,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Health check for Cloud Run.
-  if (req.method === "GET" && pathname === "/healthz") {
+  if (req.method === "GET" && (pathname === "/healthz" || pathname === "/health")) {
     sendJson(res, 200, {
       status: "ok"
     });

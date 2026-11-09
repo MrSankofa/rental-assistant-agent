@@ -12,3 +12,8 @@ describe("HTTP route pathname", () => {
     expect(requestPath("/assets/brand/logo-mark-64.png?version=1")).toBe("/assets/brand/logo-mark-64.png");
   });
 });
+
+test("health endpoint path is preserved", () => {
+  expect(requestPath("/health")).toBe("/health");
+  expect(requestPath("/health?authuser=0")).toBe("/health");
+});

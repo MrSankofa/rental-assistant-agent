@@ -184,8 +184,8 @@
               <label class="field">Property
                 <select name="targetId" required>
                   <option value="" selected>Select a property</option>
-                  <option value="ziegler">Ziegler</option>
-                  <option value="virginia">Virginia</option>
+                  <option value="ziegler">Dearborn Heights</option>
+                  <option value="virginia">Detroit</option>
                 </select>
               </label>
               <label class="field">How can we help?
@@ -249,7 +249,7 @@
 
       document.getElementById("contactHeading").textContent =
         showing
-          ? "Let's schedule your Ziegler tour."
+          ? "Let's schedule your Dearborn Heights tour."
           : "Have the landlord or property manager contact you.";
 
       document.getElementById("leadDescription").textContent =
@@ -326,7 +326,7 @@
         scheduleTourJump.hidden = false;
         humanHelpJump.hidden = false;
         document.getElementById("leadDescription").textContent =
-          "Ask our staff about Ziegler. Your information is recorded so we can respond; submitting this form does not book a showing or send an automatic message.";
+          "Ask our staff about Dearborn Heights. Your information is recorded so we can respond; submitting this form does not book a showing or send an automatic message.";
         document.getElementById("privacyLink").href = status.privacyUrl;
         document.getElementById("privacyNotice").hidden = false;
         propertySelect.value = "ziegler";
@@ -461,7 +461,7 @@
           if (button.disabled) return;
           if (["Schedule a tour"].includes(item.label) &&
               !scheduleTourJump.hidden && propertySelect.value === "ziegler") {
-            addMessage("I'd like to schedule a showing at Ziegler.", "user");
+            addMessage("I'd like to schedule a showing at Dearborn Heights.", "user");
             openLeadForm("showing");
             return;
           }
