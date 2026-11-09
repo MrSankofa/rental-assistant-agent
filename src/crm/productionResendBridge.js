@@ -4,6 +4,7 @@
 const {deliverAuthorizedProductionEmail}=require("./productionEmailDispatcher");
 const {sendResendEmail}=require("./resendTransport");
 const {RELEASE}=require("./productionDeliveryGate");
+const {unsubscribeUrl}=require("./unsubscribe");
 
 function requireProviderConfigured(env) {
   for(const [key,expected] of Object.entries(RELEASE)) {
@@ -13,6 +14,8 @@ function requireProviderConfigured(env) {
   if(typeof env.RESEND_API_KEY!=="string" ||
      !/^re_[A-Za-z0-9_-]{8,}$/.test(env.RESEND_API_KEY))
     throw Error("Production email provider credentials unavailable");
+  // Mandatory unsubscribe configuration before any task reservation or provider call.
+  unsubscribeUrl("c_"+"0".repeat(40),env);
   if(env.FIRESTORE_EMULATOR_HOST ||
      env.CRM_STAGING_TEST_MODE==="true" ||
      env.CRM_PUBLIC_INTAKE_ENABLED==="true" ||
