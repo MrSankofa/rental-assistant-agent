@@ -20,7 +20,9 @@ async function fixture() {
   await generateFollowupTasks(crm,{now});
   return {
     crm,task:(await crm.listTasks())[0],now,
-    env:{...RELEASE,RESEND_API_KEY:"re_FICTIONAL_TEST_ONLY_12345"}
+    env:{...RELEASE,RESEND_API_KEY:"re_FICTIONAL_TEST_ONLY_12345",
+      CRM_UNSUBSCRIBE_ORIGIN:"https://rental-unsubscribe-live-951837038410.us-east5.run.app",
+      CRM_UNSUBSCRIBE_SIGNING_SECRET:"a".repeat(64)}
   };
 }
 
@@ -34,6 +36,9 @@ describe("Phase 13 isolated Resend bridge: mock HTTP, no external network",()=>{
       const body=JSON.parse(options.body);
       expect(body.to).toEqual(["fictional@example.invalid"]);
       expect(body.text).toContain("Dearborn Heights");
+      expect(body.text).toContain("To stop automated rental follow-up emails");
+      expect(body.headers["List-Unsubscribe"]).toContain("rental-unsubscribe-live-");
+      expect(body.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
       return {ok:true,json:async()=>({id:"email_fictional_001"})};
     });
     const first=await deliverProductionResendEmail(f.crm,f.task.id,{
@@ -55,6 +60,18 @@ describe("Phase 13 isolated Resend bridge: mock HTTP, no external network",()=>{
     await expect(deliverProductionResendEmail(f.crm,f.task.id,{
       env:f.env,now:f.now,fetchFn
     })).rejects.toThrow("credentials unavailable");
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect((await f.crm.store.get("tasks",f.task.id)).value.status)
+      .toBe("ready-for-automatic-delivery");
+  });
+
+  test("missing unsubscribe signing secret aborts before reserving or HTTP",async()=>{
+    const f=await fixture();
+    delete f.env.CRM_UNSUBSCRIBE_SIGNING_SECRET;
+    const fetchFn=jest.fn();
+    await expect(deliverProductionResendEmail(f.crm,f.task.id,{
+      env:f.env,now:f.now,fetchFn
+    })).rejects.toThrow("signing secret invalid");
     expect(fetchFn).not.toHaveBeenCalled();
     expect((await f.crm.store.get("tasks",f.task.id)).value.status)
       .toBe("ready-for-automatic-delivery");
