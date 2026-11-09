@@ -270,6 +270,9 @@
       contactIntake.hidden = false;
       contactIntakeTurn.hidden = false;
       messages.appendChild(contactIntakeTurn);
+      if (isLiveIntake && typeof renderTurnstile === "function") {
+        renderTurnstile();
+      }
       messages.scrollTop = messages.scrollHeight;
       leadForm.elements.namedItem("firstName").focus({ preventScroll: true });
       return true;
@@ -285,9 +288,11 @@
       openLeadForm("human");
     });
     let isLiveIntake = false;
-    let turnstileReady = false;
     let turnstileWidgetId = null;
-    window.onRentalTurnstileLoaded = () => { turnstileReady = true; };
+    let renderTurnstile = null;
+    window.onRentalTurnstileLoaded = () => {
+      if (typeof renderTurnstile === "function") renderTurnstile();
+    };
     fetch("/api/crm/status").then(r => r.json()).then(status => {
       if (status.publicIntakeEnabled && status.stagingTestMode) {
         scheduleTourJump.hidden = false;
@@ -311,18 +316,35 @@
         script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onRentalTurnstileLoaded";
         script.async = true;
         script.defer = true;
-        script.onload = () => {
-          const display = () => {
-            if (window.turnstile && turnstileWidgetId === null) {
-              turnstileWidgetId = window.turnstile.render(challenge, {
-                sitekey: status.turnstileSiteKey,
-                action: "rental_inquiry"
-              });
-            }
-          };
-          display();
+        renderTurnstile = () => {
+          // Never initialize inside a hidden form.
+          if (contactIntakeTurn.hidden || contactIntake.hidden) return;
+          if (turnstileWidgetId !== null ||
+              !window.turnstile ||
+              typeof window.turnstile.render !== "function") return;
+
+          try {
+            turnstileWidgetId = window.turnstile.render(challenge, {
+              sitekey: status.turnstileSiteKey,
+              action: "rental_inquiry",
+              "error-callback": () => {
+                document.getElementById("leadStatus").textContent =
+                  "Human verification is unavailable. Please reload the page.";
+              }
+            });
+          } catch (_) {
+            document.getElementById("leadStatus").textContent =
+              "Human verification could not start. Please reload the page.";
+          }
         };
+
+        script.onerror = () => {
+          document.getElementById("leadStatus").textContent =
+            "Human verification could not load. Please reload the page.";
+        };
+
         document.head.appendChild(script);
+        if (window.turnstile) renderTurnstile();
         scheduleTourJump.hidden = false;
         humanHelpJump.hidden = false;
         document.getElementById("leadDescription").textContent =

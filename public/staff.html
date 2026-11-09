@@ -178,7 +178,7 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
 </table>
 </div>
 </section>
-<section><h2>Staff action queue</h2><p class="muted">Review tasks and recorded decisions. Email and SMS delivery remain disabled.</p>
+<section><h2>Staff action queue</h2><p class="muted">Review tasks and recorded decisions. This staff workspace does not send email or SMS. Eligible routine email follow-ups are handled by the separate production sender.</p>
 <div id="staffTaskCards" class="staff-task-grid"></div>
 <div id="legacyTaskTable" class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
 </main><script>
@@ -241,7 +241,7 @@ async function reload(){
     `Showing ${filtered.length} of ${data.pipeline.length} prospects`;
   q("workspaceDescription").textContent=live?
     (data.actionsEnabled===true
-      ? "Private live CRM: authenticated staff may record verified milestones. Automated messages and follow-up delivery remain disabled."
+      ? "Private live CRM: authenticated staff may record verified milestones. Staff-controlled message sending is disabled here. Routine production email follow-ups run separately under consent and delivery safeguards."
       : "Private live CRM: read-only review. Staff milestone changes and automated messaging are disabled.") :
     "Private staging workspace. Fictional data only; messaging is simulated.";
   q("newInquiryCount").textContent="New inquiries awaiting staff review: "+(data.attention?.newInquiryCount ?? 0);
@@ -270,7 +270,7 @@ async function reload(){
      "SMS follow-ups: "+(consent?.sms===true?"Opted in":"Not opted in"),
      "Created: "+stamp(e.createdAt),
      "Updated: "+stamp(e.updatedAt)
-   ].join("\\n");
+   ].join("\n");
    details.append(summary,content);
    contactCell.appendChild(details);
    cell(tr,propertyName(e.property));
