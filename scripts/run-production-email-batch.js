@@ -5,6 +5,7 @@ const {CRM}=require("../src/crm/workflows");
 const {makeStore}=require("../src/crm/storage");
 const {RELEASE}=require("../src/crm/productionDeliveryGate");
 const {deliverProductionResendEmail}=require("../src/crm/productionResendBridge");
+const {unsubscribeUrl}=require("../src/crm/unsubscribe");
 
 const EXECUTION_APPROVAL="EXECUTE_BOUNDED_ROUTINE_EMAIL_BATCH";
 const MAX_BATCH=10;
@@ -19,6 +20,8 @@ function validate(env) {
      env.CRM_REAL_INTAKE_ENABLED==="true" ||
      env.CRM_STAGING_TEST_MODE==="true")
     throw Error("Production email execution unauthorized");
+  // Fail closed before CRM initialization, even for an empty queue.
+  unsubscribeUrl("c_"+"0".repeat(40),env);
   if(!Number.isSafeInteger(Number(env.CRM_PRODUCTION_BATCH_LIMIT)) ||
      String(Number(env.CRM_PRODUCTION_BATCH_LIMIT))!==env.CRM_PRODUCTION_BATCH_LIMIT ||
      Number(env.CRM_PRODUCTION_BATCH_LIMIT)<1 ||
