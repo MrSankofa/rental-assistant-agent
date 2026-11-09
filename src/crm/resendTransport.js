@@ -13,7 +13,7 @@ function validateMessage({from,to,subject,text,idempotencyKey,headers}) {
   if(headers!==undefined &&
      (!headers || typeof headers!=="object" ||
       !(headers["List-Unsubscribe"]||"").startsWith("<https://") ||
-      /[\\s]/.test(headers["List-Unsubscribe"]||"") ||
+      /\s/.test(headers["List-Unsubscribe"]||"") ||
       !(headers["List-Unsubscribe"]||"").endsWith(">") ||
       headers["List-Unsubscribe-Post"]!=="List-Unsubscribe=One-Click" ||
       Object.keys(headers).length!==2))
