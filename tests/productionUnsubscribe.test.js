@@ -37,6 +37,29 @@ describe("signed production unsubscribe",()=>{
       CRM_UNSUBSCRIBE_SIGNING_SECRET:secret
     })).toThrow("origin invalid");
   });
+  test("valid HTTPS one-click headers pass outbound message validation",()=>{
+    const {validateMessage}=require("../src/crm/resendTransport");
+    const url=unsubscribeUrl(contactId,{
+      CRM_UNSUBSCRIBE_ORIGIN:"https://rental-unsubscribe-live-951837038410.us-east5.run.app",
+      CRM_UNSUBSCRIBE_SIGNING_SECRET:secret
+    });
+    const message={
+      from:"Rental Assistant <rentals@altruisticdevelopment.com>",
+      to:"fictional@example.invalid",
+      subject:"Rental Assistant follow-up",
+      text:"Hello, this is a synthetic rental follow-up. Unsubscribe: "+url,
+      idempotencyKey:"rental-fu_"+"b".repeat(40),
+      headers:{
+        "List-Unsubscribe":"<"+url+">",
+        "List-Unsubscribe-Post":"List-Unsubscribe=One-Click"
+      }
+    };
+    expect(()=>validateMessage(message)).not.toThrow();
+    expect(()=>validateMessage({...message,headers:{
+      ...message.headers,"List-Unsubscribe":"<https://bad.example/path with space>"
+    }})).toThrow("Invalid unsubscribe headers");
+  });
+
   test("POST suppression is monotonic and repeat-safe",async()=>{
     const x=crm();
     await x.store.create("contacts",contactId,{
