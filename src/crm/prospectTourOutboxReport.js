@@ -22,7 +22,7 @@ async function inspectProspectTourOutbox(crm,{env={},now=new Date()}={}) {
  const result={inspected:tasks.length,plannerTasks:0,
    pendingApproval:0,cancelled:0,
    simulationReserved:0,simulationCompleted:0,
-   staleReservations:0,other:0};
+   staleReservations:0,ownerAccepted:0,ownerReserved:0,ownerNeedsReconciliation:0,ownerStaleReservations:0,other:0};
  for(const task of tasks){
    if(task?.source!=="prospect-tour-planner" ||
       task.policyVersion!=="prospect-tour-messages-v1") continue;
@@ -35,6 +35,12 @@ async function inspectProspectTourOutbox(crm,{env={},now=new Date()}={}) {
      const at=Date.parse(task.reservationAt||"");
      if(!Number.isFinite(at) || clock-at>=STALE_AFTER_MS)
        result.staleReservations++;
+   } else if(task.status==="owner-delivery-accepted") result.ownerAccepted++;
+   else if(task.status==="owner-delivery-needs-reconciliation") result.ownerNeedsReconciliation++;
+   else if(task.status==="owner-delivery-reserved"){
+     result.ownerReserved++;
+     const at=Date.parse(task.ownerDelivery?.reservedAt||"");
+     if(!Number.isFinite(at)||clock-at>=STALE_AFTER_MS)result.ownerStaleReservations++;
    } else result.other++;
  }
  return result;
