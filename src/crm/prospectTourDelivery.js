@@ -52,7 +52,7 @@ function compose({contact,booking,type,url}) {
     text:["Hello "+name+",","",intro+" for the "+property+
       " rental is scheduled for "+booking.startsAt+".","",
       "Continue your rental conversation securely:",url,"",
-      "This single-use return link expires in 15 minutes. If it expires, request a new one.",
+      "This single-use return link expires in 48 hours. If it expires, request a new one.",
       "","Rental Assistant"].join("\n")};
 }
 async function simulateTourEmail(crm,taskId,{env={},now=new Date(),
