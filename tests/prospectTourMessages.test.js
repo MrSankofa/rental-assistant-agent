@@ -67,3 +67,22 @@ test("confirmation remains independently eligible inside reminder window",()=>{
   expect(before[0].id).toBe(within[0].id);
   expect(within[1].id).not.toBe(within[0].id);
 });
+
+test("confirmation due time is stable across later scheduler runs",()=>{
+  const {planTourMessages}=require("../src/crm/prospectTourMessages");
+  const input={
+    booking:{id:"b_stable",provider:"calendly",status:"scheduled",
+      crmSyncStatus:"completed",engagementId:"e_stable",
+      propertyId:"ziegler",startsAt:"2026-12-01T15:00:00Z",
+      endsAt:"2026-12-01T15:30:00Z",createdAt:"2026-11-25T15:00:00Z"},
+    engagement:{id:"e_stable",contactId:"c_stable",
+      targetId:"ziegler",domain:"rental",stage:"TOUR_SCHEDULED"},
+    contact:{id:"c_stable",email:"fictional@example.test",
+      preferredChannel:"email",consent:{recording:true,email:true}}
+  };
+  const a=planTourMessages({...input,now:"2026-11-26T00:00:00Z"})[0];
+  const b=planTourMessages({...input,now:"2026-11-30T18:00:00Z"})[0];
+  expect(a.id).toBe(b.id);
+  expect(a.dueAt).toBe("2026-11-25T15:00:00.000Z");
+  expect(b.dueAt).toBe(a.dueAt);
+});
