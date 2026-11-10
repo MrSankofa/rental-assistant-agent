@@ -13,7 +13,11 @@ const NEXT = Object.freeze({
   APPROVED: "RENTREDI_ONBOARDING",
   RENTREDI_ONBOARDING: "LEASE_SIGNING_SCHEDULED",
   LEASE_SIGNING_SCHEDULED: "DISCLOSURES_READY_AND_DELIVERED",
-  DISCLOSURES_READY_AND_DELIVERED: "LEASE_SIGNED"
+  DISCLOSURES_READY_AND_DELIVERED: "LEASE_SIGNED",
+  LEASE_SIGNED: "MOVE_IN_FUNDS_VERIFIED",
+  MOVE_IN_FUNDS_VERIFIED: "KEYS_RELEASED",
+  KEYS_RELEASED: "MOVE_IN_CHECKLIST_PENDING",
+  MOVE_IN_CHECKLIST_PENDING: "MOVE_IN_COMPLETED"
 });
 
 function actionsEnabled(env) {
@@ -83,7 +87,11 @@ function validateMilestone(current, input) {
     RENTREDI_ONBOARDING: "Schedule external lease signing",
     LEASE_SIGNING_SCHEDULED: "Prepare and deliver disclosures",
     DISCLOSURES_READY_AND_DELIVERED: "Verify external signatures",
-    LEASE_SIGNED: "Verify move-in requirements separately"
+    LEASE_SIGNED: "Verify move-in requirements separately",
+    MOVE_IN_FUNDS_VERIFIED: "Confirm funds independently",
+    KEYS_RELEASED: "Complete move-in checklist",
+    MOVE_IN_CHECKLIST_PENDING: "Confirm move-in completion",
+    MOVE_IN_COMPLETED: "Rental onboarding completed"
   };
 
   return {
