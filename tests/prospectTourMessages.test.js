@@ -36,6 +36,9 @@ describe("Phase 22 safe tour communication planning", () => {
     ["wrong property", obj => { obj.booking.propertyId = "virginia"; }],
     ["stale engagement", obj => { obj.engagement.stage = "TOUR_CANCELLED"; }],
     ["missing consent", obj => { obj.contact.consent.recording = false; }],
+    ["contact opted out", obj => { obj.contact.optedOutAt = "2026-11-20T00:00:00Z"; }],
+    ["engagement opted out", obj => { obj.engagement.optedOutAt = "2026-11-20T00:00:00Z"; }],
+    ["staff escalation", obj => { obj.engagement.needsStaffReview = true; }],
     ["no email channel", obj => { obj.contact.preferredChannel = "none"; }],
     ["completed tour", obj => { obj.now = "2026-12-01T16:00:00Z"; }]
   ])("suppresses %s", (_name, change) => {
