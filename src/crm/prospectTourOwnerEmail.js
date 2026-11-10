@@ -31,9 +31,12 @@ function validate(crm,env){
     !env.RESEND_API_KEY.startsWith("re_"))
    throw Error("Controlled Phase22 owner email not authorized");
  const origin=env.PHASE22_OWNER_RETURN_ORIGIN;
- if(typeof origin!=="string" ||
-    !/^https:\/\/[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(origin) ||
-    origin.includes("..") || origin.includes("@"))
+ // The return link contains a bearer token. Never allow arbitrary HTTPS hosts.
+ // This owner-only release is restricted to the previously verified Cloud Shell
+ // preview; PUBLIC_ORIGIN must match the prospect-session CSRF trust boundary.
+ const authorizedPreview=
+  "https://8081-cs-1052145169010-default.cs-us-east1-dogs.cloudshell.dev";
+ if(origin!==authorizedPreview || env.PUBLIC_ORIGIN!==authorizedPreview)
    throw Error("Controlled Phase22 return origin invalid");
 }
 function fixtureOnly(task,booking,engagement,contact){
