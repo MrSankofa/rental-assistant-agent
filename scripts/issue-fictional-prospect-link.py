@@ -82,7 +82,7 @@ def main():
     args = parser.parse_args()
     if not args.issue or os.getenv("P21_FIXTURE_APPROVAL") != APPROVAL:
         sys.exit("REFUSED: explicit fictional staging approval required")
-    if not re.fullmatch(r"https://8081-cs-[A-Za-z0-9-]+\.cloudshell\.dev", args.origin):
+    if not re.fullmatch(r"https://8081-cs-[a-z0-9-]+\.cs-[a-z0-9-]+\.cloudshell\.dev", args.origin):
         sys.exit("REFUSED: unexpected Cloud Shell preview origin")
     if subprocess.check_output(
         ["gcloud", "config", "get-value", "project"], text=True
