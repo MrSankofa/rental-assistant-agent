@@ -20,6 +20,8 @@ function planTourMessage({ booking, engagement, contact, now = new Date() }) {
   // Actual transactional classification, opt-outs, and delivery permission
   // MUST be checked by the separate delivery gate before sending.
   if (contact.consent?.recording !== true ||
+      contact.doNotContact === true || contact.optedOutAt ||
+      engagement.optedOutAt || engagement.needsStaffReview ||
       contact.preferredChannel !== "email" ||
       typeof contact.email !== "string" ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) return null;
