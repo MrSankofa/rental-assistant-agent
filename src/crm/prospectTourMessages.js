@@ -40,6 +40,7 @@ function planTourMessage({ booking, engagement, contact, now = new Date() }) {
     bookingId: booking.id,
     scheduledStart: booking.startsAt,
     recipientContactId: contact.id,
+    dueAt: new Date(type === "TOUR_REMINDER" ? starts - 24 * HOUR : clock).toISOString(),
     status: "pending-policy-review",
     // Deliberately no email contents or credentials in a queue payload.
     // Delivery must re-load booking/contact, check suppression, create a
