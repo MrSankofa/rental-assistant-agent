@@ -45,7 +45,11 @@ function planTourMessages({ booking, engagement, contact, now = new Date() }) {
       bookingId: booking.id,
       scheduledStart: booking.startsAt,
       recipientContactId: contact.id,
-      dueAt: new Date(type === "TOUR_REMINDER" ? starts - 24 * HOUR : clock).toISOString(),
+      // The confirmation deadline is the provider event creation time when
+      // available, not the instant a reconciliation worker happens to run.
+      dueAt: new Date(type === "TOUR_REMINDER" ? starts - 24 * HOUR :
+        (Number.isFinite(Date.parse(booking.createdAt || ""))
+          ? Date.parse(booking.createdAt) : clock)).toISOString(),
       status: "pending-policy-review",
       deliveryEnabled: false
     }];
