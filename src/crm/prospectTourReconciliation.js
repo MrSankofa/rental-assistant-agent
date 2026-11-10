@@ -1,6 +1,6 @@
 "use strict";
 const { StoreConflict } = require("./storage");
-const { planTourMessage, POLICY_VERSION } = require("./prospectTourMessages");
+const { planTourMessages, POLICY_VERSION } = require("./prospectTourMessages");
 
 // The new event planner deliberately makes ONLY review tasks. It never
 // invokes the email provider or enables the existing follow-up delivery gate.
@@ -52,8 +52,8 @@ async function reconcileProspectTourMessages(crm,{env={},now=new Date()}={}) {
   for (const booking of bookings) {
     const engagement=byEngagement.get(booking.engagementId);
     const contact=engagement && byContact.get(engagement.contactId);
-    const plan=planTourMessage({booking,engagement,contact,now});
-    if (plan) intended.set(plan.id,plan);
+    for(const plan of planTourMessages({booking,engagement,contact,now}))
+      intended.set(plan.id,plan);
   }
   const results={planned:intended.size,created:0,alreadyExists:0,cancelled:0};
   for (const task of tasks) {
@@ -68,8 +68,8 @@ async function reconcileProspectTourMessages(crm,{env={},now=new Date()}={}) {
     const b=(await crm.store.get("bookings",plan.bookingId))?.value;
     const e=b&&(await crm.store.get("engagements",b.engagementId))?.value;
     const c=e&&(await crm.store.get("contacts",e.contactId))?.value;
-    const refreshed=planTourMessage({booking:b,engagement:e,contact:c,now});
-    if (!refreshed || refreshed.id!==plan.id) continue;
+    const refreshed=planTourMessages({booking:b,engagement:e,contact:c,now});
+    if (!refreshed.some(candidate=>candidate.id===plan.id)) continue;
     const task={
       ...plan,source:"prospect-tour-planner",
       status:"pending-approval",owner:"staff",routing:"staff-review",
