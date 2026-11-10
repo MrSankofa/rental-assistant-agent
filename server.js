@@ -5,6 +5,7 @@ const { requestPath } = require("./src/http/requestPath");
 const { verifyIapIdentity } = require("./src/http/iapIdentity");
 const { handleCalendlyWebhook } = require("./src/http/calendlyWebhookRoute");
 const { askAI } = require("./src/agent/openai");
+const { handleProspectSession } = require("./src/http/prospectSessionRoutes");
 
 
 const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
@@ -75,6 +76,9 @@ function sendJson(res, status, data) {
 
 const server = http.createServer(async (req, res) => {
   const pathname = requestPath(req.url);
+
+  // Opt-in prospect authentication. Existing production requests remain unchanged.
+  if (await handleProspectSession({req,res,crm,env:process.env,pathname})) return;
 
   // Calendly integration is staging-only and read-only at this phase.
   if (req.method === "POST" &&
