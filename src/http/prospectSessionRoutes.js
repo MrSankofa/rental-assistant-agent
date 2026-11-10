@@ -1,6 +1,7 @@
 "use strict";
 const { exchangeReturnLink, getProspectContext, revokeSession } =
   require("../crm/prospectIdentity");
+const { loadConversation } = require("../crm/prospectConversation");
 
 const COOKIE = "__Host-rental_prospect";
 const MAX_BODY = 2048;
@@ -53,18 +54,21 @@ function reply(res, status, body, headers = {}) {
 }
 async function handleProspectSession({req, res, crm, env, pathname}) {
   if (!crm || env.PROSPECT_SESSION_ENABLED !== "true" ||
-      !["/api/prospect/session", "/api/prospect/context"].includes(pathname))
+      !["/api/prospect/session", "/api/prospect/context", "/api/prospect/conversation"].includes(pathname))
     return false;
 
   // Session tokens are not readable by JS, and will never be placed in a
   // response body. Only the verified server-scoped context is returned.
-  if (pathname === "/api/prospect/context" && req.method === "GET") {
+  if (["/api/prospect/context", "/api/prospect/conversation"].includes(pathname) && req.method === "GET") {
     const session = parseSessionCookie(req.headers.cookie);
     if (!session) { reply(res, 401, { error: "Session required" }); return true; }
     try {
       const context = await getProspectContext(crm.store, session);
       const { engagementId, ...safeContext } = context;
-      reply(res, 200, safeContext);
+      if (pathname === "/api/prospect/conversation") {
+        const conversation = await loadConversation(crm.store,engagementId);
+        reply(res,200,{...safeContext,turns:conversation.turns});
+      } else reply(res, 200, safeContext);
     } catch {
       reply(res, 401, { error: "Session unavailable" },
         { "Set-Cookie": cookie("", 0) });
@@ -103,7 +107,7 @@ async function handleProspectSession({req, res, crm, env, pathname}) {
     return true;
   }
   reply(res, 405, {error:"Method not allowed"}, {"Allow":
-    pathname === "/api/prospect/context" ? "GET" : "POST, DELETE"});
+    pathname !== "/api/prospect/session" ? "GET" : "POST, DELETE"});
   return true;
 }
 module.exports = { handleProspectSession, parseSessionCookie, authorizedOrigin, cookie };
