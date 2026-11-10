@@ -11,7 +11,9 @@ const env={
  CRM_PRODUCTION_EMAIL_ENABLED:"false",PROSPECT_SESSION_ENABLED:"true",
  PHASE22_OWNER_EMAIL_APPROVAL:APPROVAL,
  PHASE22_OWNER_PROVIDER_APPROVAL:PROVIDER_APPROVAL,
- PHASE22_OWNER_TEST_TO:INBOX,\n PHASE22_OWNER_RETURN_ORIGIN:"https://8081-cs-1052145169010-default.cs-us-east1-dogs.cloudshell.dev",\n PUBLIC_ORIGIN:"https://8081-cs-1052145169010-default.cs-us-east1-dogs.cloudshell.dev",
+ PHASE22_OWNER_TEST_TO:INBOX,
+ PHASE22_OWNER_RETURN_ORIGIN:"https://8081-cs-1052145169010-default.cs-us-east1-dogs.cloudshell.dev",
+ PUBLIC_ORIGIN:"https://8081-cs-1052145169010-default.cs-us-east1-dogs.cloudshell.dev",
  RESEND_API_KEY:"re_dummy_test_key"
 };
 async function fixture({source=SOURCE,email=INBOX,consent=true,
