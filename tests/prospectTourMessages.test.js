@@ -47,3 +47,23 @@ describe("Phase 22 safe tour communication planning", () => {
     expect(planTourMessage(input)).toBeNull();
   });
 });
+
+test("confirmation remains independently eligible inside reminder window",()=>{
+  const {planTourMessages}=require("../src/crm/prospectTourMessages");
+  const input={
+    booking:{id:"b_independent",provider:"calendly",status:"scheduled",
+      crmSyncStatus:"completed",engagementId:"e_independent",
+      propertyId:"ziegler",startsAt:"2026-12-01T15:00:00Z",
+      endsAt:"2026-12-01T15:30:00Z"},
+    engagement:{id:"e_independent",contactId:"c_independent",
+      targetId:"ziegler",domain:"rental",stage:"TOUR_SCHEDULED"},
+    contact:{id:"c_independent",email:"fictional@example.test",
+      preferredChannel:"email",consent:{recording:true,email:true}}
+  };
+  const before=planTourMessages({...input,now:"2026-11-29T18:00:00Z"});
+  const within=planTourMessages({...input,now:"2026-11-30T18:00:00Z"});
+  expect(before.map(x=>x.type)).toEqual(["TOUR_CONFIRMATION"]);
+  expect(within.map(x=>x.type)).toEqual(["TOUR_CONFIRMATION","TOUR_REMINDER"]);
+  expect(before[0].id).toBe(within[0].id);
+  expect(within[1].id).not.toBe(within[0].id);
+});
