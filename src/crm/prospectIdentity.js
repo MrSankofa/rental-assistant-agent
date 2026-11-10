@@ -2,7 +2,9 @@
 const crypto = require("crypto");
 const { StoreConflict } = require("./storage");
 
-const LINK_TTL_MS = 15 * 60 * 1000;
+// Emailed tour links remain usable across a reasonable reading window.
+// A redeemed link is still single-use; authenticated sessions stay short lived.
+const LINK_TTL_MS = 48 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const digest = value => crypto.createHash("sha256").update(value).digest("hex");
 const fail = (status, message) => Object.assign(new Error(message), { status });
