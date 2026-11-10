@@ -1,7 +1,7 @@
 "use strict";
 const {issueReturnLink} = require("./prospectIdentity");
 const {StoreConflict} = require("./storage");
-const {planTourMessage} = require("./prospectTourMessages");
+const {planTourMessages} = require("./prospectTourMessages");
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const APPROVAL = "SIMULATE_ONE_FICTIONAL_TOUR_EMAIL";
@@ -35,9 +35,9 @@ function eligible({task,booking,engagement,contact,now}) {
       contact?.optedOutAt || contact?.doNotContact===true ||
       engagement?.optedOutAt || engagement?.needsStaffReview)
     return false;
-  const planned=planTourMessage({booking,engagement,contact,now});
-  return planned?.id===task.id && planned?.type===task.type &&
-    planned?.scheduledStart===task.scheduledStart;
+  const planned=planTourMessages({booking,engagement,contact,now});
+  return planned.some(p=>p.id===task.id && p.type===task.type &&
+    p.scheduledStart===task.scheduledStart);
 }
 function compose({contact,booking,type,url}) {
   const property=booking.propertyId==="ziegler"?"Dearborn Heights":
