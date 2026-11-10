@@ -41,6 +41,7 @@ function validate(crm,env){
 }
 function fixtureOnly(task,booking,engagement,contact){
  return Boolean(task?.source==="prospect-tour-planner" &&
+  task.type==="TOUR_CONFIRMATION" &&
   task.status==="pending-approval" &&
   task.policyVersion==="prospect-tour-messages-v1" &&
   booking?.source===SOURCE && engagement?.source===SOURCE &&
