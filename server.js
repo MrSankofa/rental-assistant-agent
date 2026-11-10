@@ -5,7 +5,9 @@ const { requestPath } = require("./src/http/requestPath");
 const { verifyIapIdentity } = require("./src/http/iapIdentity");
 const { handleCalendlyWebhook } = require("./src/http/calendlyWebhookRoute");
 const { askAI } = require("./src/agent/openai");
-const { handleProspectSession } = require("./src/http/prospectSessionRoutes");
+const { handleProspectSession, parseSessionCookie, authorizedOrigin } = require("./src/http/prospectSessionRoutes");
+const { getProspectContext } = require("./src/crm/prospectIdentity");
+const { loadConversation, appendConversation } = require("./src/crm/prospectConversation");
 
 
 const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
@@ -442,13 +444,45 @@ const server = http.createServer(async (req, res) => {
           ? data.previousResponseId
           : null;
 
+      // Only a verified cookie may activate persisted personalized context.
+      // Browser-supplied contact IDs or previousResponseId are never trusted.
+      let verifiedProspect = null;
+      let history = null;
+      if (crm && process.env.PROSPECT_SESSION_ENABLED === "true" &&
+          req.headers.cookie?.includes("__Host-rental_prospect=")) {
+        if (!authorizedOrigin(req.headers,process.env.PUBLIC_ORIGIN)) {
+          sendJson(res,403,{error:"Request not permitted"});return;
+        }
+        const sessionToken = parseSessionCookie(req.headers.cookie);
+        if (!sessionToken) {sendJson(res,401,{error:"Session expired"});return;}
+        try {
+          verifiedProspect = await getProspectContext(crm.store,sessionToken);
+          history = await loadConversation(crm.store,verifiedProspect.engagementId);
+        } catch (error) {
+          sendJson(res,error.status === 403 ? 403 : 401,
+            {error:"Session unavailable"});return;
+        }
+      }
+
       const result = await askAI(
         data.message.trim(),
-        previousResponseId,
+        verifiedProspect ? null : previousResponseId,
         { followUpFormAvailable: publicIntakeStatus.publicIntakeEnabled,
-          guidedShowingFormAvailable: publicIntakeStatus.stagingTestMode }
+          guidedShowingFormAvailable: publicIntakeStatus.stagingTestMode,
+          verifiedProspect,
+          priorTurns:history?.turns || [] }
       );
 
+      if (verifiedProspect) {
+        await appendConversation(crm.store,verifiedProspect.engagementId,
+          history.version,[
+            {role:"user",content:data.message.trim()},
+            {role:"assistant",content:result.answer}
+          ]);
+        // Do not return a provider response ID for an authenticated session.
+        sendJson(res,200,{answer:result.answer,propertyId:verifiedProspect.propertyId});
+        return;
+      }
       sendJson(res, 200, result);
 
     } catch (error) {
