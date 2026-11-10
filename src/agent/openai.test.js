@@ -27,3 +27,15 @@ test("fictional staging requests minimum contact fields without exposing direct 
   expect(guided).toContain("do not output the showingUrl in the chat");
   expect(buildInstructions()).toContain("provide the showingUrl");
 });
+
+test("verified CRM context is allowlisted and tells agent not to invent provider outcomes",()=>{
+  const prompt=buildInstructions({verifiedProspect:{
+    propertyId:"ziegler",stage:"TOUR_SCHEDULED",nextAction:"Attend tour",
+    staffNotes:"SECRET STAFF COMMENT"
+  }});
+  expect(prompt).toContain("VERIFIED RETURNING PROSPECT CONTEXT");
+  expect(prompt).toContain("TOUR_SCHEDULED");
+  expect(prompt).toContain("Attend tour");
+  expect(prompt).not.toContain("SECRET STAFF COMMENT");
+  expect(prompt).toContain("Do not claim external booking");
+});
