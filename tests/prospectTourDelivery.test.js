@@ -38,6 +38,7 @@ describe("Phase 22 simulated personalized return email",()=>{
   expect(result).toEqual({outcome:"simulated",sent:false});
   expect(message.to).toBe(t.contact.email);
   expect(message.text).toContain("Dearborn Heights");
+  expect(message.text).toContain("expires in 48 hours");
   expect(message.text).toContain("https://rental.example.test/#resume=");
   const token=message.text.match(/#resume=([A-Za-z0-9_-]+)/)[1];
   const session=await exchangeReturnLink(t.store,token,{clock:()=>now.getTime()+500});
@@ -90,4 +91,29 @@ describe("Phase 22 simulated personalized return email",()=>{
   expect((await simulateTourEmail(t.crm,t.task.id,opts(async()=>{throw Error("called");}))).outcome)
     .toBe("skipped");
  });
+ test("concurrent dispatchers reserve once and never duplicate simulation",async()=>{
+  const t=await fixture();
+  let calls=0;
+  const transport=async()=>{calls++;return {status:"simulated"};};
+  const attempts=await Promise.all([
+    simulateTourEmail(t.crm,t.task.id,opts(transport)),
+    simulateTourEmail(t.crm,t.task.id,opts(transport))
+  ]);
+  expect(attempts.filter(a=>a.outcome==="simulated")).toHaveLength(1);
+  expect(calls).toBe(1);
+ });
+ test("return link survives a next-day email opening but remains single-use",async()=>{
+  const t=await fixture();
+  let message;
+  await simulateTourEmail(t.crm,t.task.id,opts(async m=>{
+    message=m;return {status:"simulated"};
+  }));
+  const token=message.text.match(/#resume=([A-Za-z0-9_-]+)/)[1];
+  const nextDay=now.getTime()+24*60*60*1000;
+  const session=await exchangeReturnLink(t.store,token,{clock:()=>nextDay});
+  expect(session.sessionToken).toBeTruthy();
+  await expect(exchangeReturnLink(t.store,token,{clock:()=>nextDay+1}))
+    .rejects.toMatchObject({status:401});
+ });
+
 });
