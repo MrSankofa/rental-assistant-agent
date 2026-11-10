@@ -32,7 +32,7 @@ async function fixture({source=SOURCE,email=INBOX,consent=true,
   ["engagements",engagement],["bookings",booking]])
   await store.create(collection,record.id,record);
  const planned=planTourMessages({booking,engagement,contact,now});
- const plan=planned.find(x=>x.type==="TOUR_REMINDER");
+ const plan=planned.find(x=>x.type==="TOUR_CONFIRMATION");
  if(!plan)return {store,crm,task:null};
  const task={...plan,source:"prospect-tour-planner",
   status:"pending-approval",routing:"staff-review",approved:false,
@@ -94,4 +94,17 @@ test("rejects wrong job, recipient and environment before access",async()=>{
    transport:async()=>{throw Error("should never call");}}))
    .rejects.toThrow();
  }
+});
+
+test("owner-only bridge refuses reminder even if routed as pending review",async()=>{
+ const t=await fixture();
+ const row=await t.store.get("tasks",t.task.id);
+ await t.store.replace("tasks",t.task.id,{
+  ...row.value,type:"TOUR_REMINDER"
+ },row.version);
+ let calls=0;
+ const result=await deliverOwnerTest(t.crm,t.task.id,{env,now,
+  transport:async()=>{calls++;return {status:"accepted",providerId:"unexpected"};}});
+ expect(result.outcome).toBe("skipped");
+ expect(calls).toBe(0);
 });
