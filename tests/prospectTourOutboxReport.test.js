@@ -26,7 +26,7 @@ test("counts only tour planner statuses without exposing identities",async()=>{
   env,now:"2026-11-30T18:00:00Z"});
  expect(report).toEqual({inspected:7,plannerTasks:6,pendingApproval:1,
   cancelled:1,simulationCompleted:1,simulationReserved:2,
-  staleReservations:1,other:1});
+  staleReservations:1,ownerAccepted:0,ownerReserved:0,ownerNeedsReconciliation:0,ownerStaleReservations:0,other:1});
  expect(JSON.stringify(report)).not.toContain("private@example.test");
 });
 test("fails closed on wrong database, scope, delivery mode or credentials",async()=>{
@@ -47,4 +47,21 @@ test("fails closed instead of reporting an incomplete 200-row scan",async()=>{
    task("task_"+i,"pending-approval"));
  await expect(inspectProspectTourOutbox(crm,{env}))
    .rejects.toThrow("incomplete tour outbox scan");
+});
+
+test("counts owner acceptance, uncertain dispatch, and stale owner reservation",async()=>{
+ const {store,crm}=fixture();
+ const items=[
+  task("pm_owner1","owner-delivery-accepted",{ownerDelivery:{status:"accepted",providerId:"receipt"}}),
+  task("pm_owner2","owner-delivery-needs-reconciliation",{ownerDelivery:{status:"uncertain"}}),
+  task("pm_owner3","owner-delivery-reserved",{ownerDelivery:{status:"reserved",reservedAt:"2026-11-30T17:00:00Z"}}),
+  task("pm_owner4","owner-delivery-reserved",{ownerDelivery:{status:"reserved",reservedAt:"2026-11-30T17:59:00Z"}})
+ ];
+ for(const item of items)await store.create("tasks",item.id,item);
+ const result=await inspectProspectTourOutbox(crm,{env,now:"2026-11-30T18:00:00Z"});
+ expect(result).toMatchObject({
+  inspected:4,plannerTasks:4,ownerAccepted:1,ownerNeedsReconciliation:1,
+  ownerReserved:2,ownerStaleReservations:1,other:0
+ });
+ expect(JSON.stringify(result)).not.toContain("receipt");
 });
