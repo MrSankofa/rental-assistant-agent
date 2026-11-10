@@ -29,10 +29,10 @@ describe("Phase 22 tour-message reconciliation",()=>{
   const t=input();await seed(t);
   const first=await reconcileProspectTourMessages(t.crm,{env,now:clock});
   const second=await reconcileProspectTourMessages(t.crm,{env,now:clock});
-  expect(first.created).toBe(1);
-  expect(second).toMatchObject({created:0,alreadyExists:1,cancelled:0});
+  expect(first.created).toBe(2);
+  expect(second).toMatchObject({created:0,alreadyExists:2,cancelled:0});
   const tasks=await t.store.list("tasks");
-  expect(tasks).toHaveLength(1);
+  expect(tasks).toHaveLength(2);
   expect(tasks[0]).toMatchObject({
     status:"pending-approval",approved:false,
     automatedDelivery:false,deliveryEnabled:false,
@@ -47,8 +47,8 @@ describe("Phase 22 tour-message reconciliation",()=>{
   await t.store.replace("bookings",t.booking.id,
     {...row.value,status:"cancelled"},row.version);
   expect(await reconcileProspectTourMessages(t.crm,{env,now:clock}))
-    .toMatchObject({planned:0,created:0,cancelled:1});
-  expect((await t.store.list("tasks"))[0].status).toBe("cancelled");
+    .toMatchObject({planned:0,created:0,cancelled:2});
+  expect((await t.store.list("tasks")).every(t=>t.status==="cancelled")).toBe(true);
  });
  test("rescheduling invalidates old candidate and produces new ID",async()=>{
   const t=input();await seed(t);
@@ -58,10 +58,10 @@ describe("Phase 22 tour-message reconciliation",()=>{
     ...row.value,startsAt:"2026-12-01T17:00:00Z",
     endsAt:"2026-12-01T17:30:00Z"},row.version);
   expect(await reconcileProspectTourMessages(t.crm,{env,now:clock}))
-    .toMatchObject({cancelled:1,created:1});
+    .toMatchObject({cancelled:2,created:2});
   const tasks=await t.store.list("tasks");
-  expect(new Set(tasks.map(t=>t.id)).size).toBe(2);
-  expect(tasks.filter(t=>t.status==="pending-approval")).toHaveLength(1);
+  expect(new Set(tasks.map(t=>t.id)).size).toBe(4);
+  expect(tasks.filter(t=>t.status==="pending-approval")).toHaveLength(2);
  });
  test("consent withdrawal cancels pending candidate",async()=>{
   const t=input();await seed(t);
@@ -70,7 +70,7 @@ describe("Phase 22 tour-message reconciliation",()=>{
   await t.store.replace("contacts",t.contact.id,{
     ...row.value,consent:{recording:false,email:false}},row.version);
   expect(await reconcileProspectTourMessages(t.crm,{env,now:clock}))
-    .toMatchObject({planned:0,cancelled:1});
+    .toMatchObject({planned:0,cancelled:2});
  });
  test("production or unapproved environment fails closed",async()=>{
   const t=input();await seed(t);
