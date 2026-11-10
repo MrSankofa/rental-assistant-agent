@@ -60,6 +60,11 @@ describe("Phase 21 prospect session HTTP boundary", () => {
     expect(context.status).toBe(200);
     expect(context.body).toEqual({propertyId:"ziegler",
       stage:"TOUR_SCHEDULED",nextAction:"Attend showing",prospectName:"Fictional"});
+    const restored = await invoke(request("GET","/api/prospect/conversation",
+      {cookie:rawCookie}),crm);
+    expect(restored.status).toBe(200);
+    expect(restored.body.turns).toEqual([]);
+    expect(restored.body.engagementId).toBeUndefined();
     const replay=await invoke(request("POST","/api/prospect/session",
       {origin,"content-type":"application/json"},{token}),crm);
     expect(replay.status).toBe(401);
