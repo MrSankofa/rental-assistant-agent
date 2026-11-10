@@ -2,6 +2,7 @@
 const {issueReturnLink} = require("./prospectIdentity");
 const {StoreConflict} = require("./storage");
 const {planTourMessages} = require("./prospectTourMessages");
+const {withinDeliveryWindow} = require("./prospectTourDeliveryPolicy");
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const APPROVAL = "SIMULATE_ONE_FICTIONAL_TOUR_EMAIL";
@@ -35,6 +36,7 @@ function eligible({task,booking,engagement,contact,now}) {
       contact?.optedOutAt || contact?.doNotContact===true ||
       engagement?.optedOutAt || engagement?.needsStaffReview)
     return false;
+  if(!withinDeliveryWindow({task,booking,now})) return false;
   const planned=planTourMessages({booking,engagement,contact,now});
   return planned.some(p=>p.id===task.id && p.type===task.type &&
     p.scheduledStart===task.scheduledStart);
