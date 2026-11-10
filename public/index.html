@@ -463,6 +463,52 @@
     const button = document.getElementById("sendButton");
     let previousResponseId =
     sessionStorage.getItem("rentalAssistantResponseId");
+    // A fragment token is removed immediately and exchanged for an HttpOnly cookie.
+    let verifiedProspect = false;
+    async function restoreVerifiedProspect() {
+      const fragment = new URLSearchParams(location.hash.slice(1));
+      const resumeToken = fragment.get("resume");
+      if (resumeToken) {
+        history.replaceState(null, "", location.pathname + location.search);
+        try {
+          const exchanged = await fetch("/api/prospect/session", {
+            method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({token:resumeToken})
+          });
+          if (!exchanged.ok) throw Error("Link expired");
+        } catch {
+          addMessage("Your secure return link is invalid or expired. Please request a new link.", "assistant");
+          return;
+        }
+      }
+      try {
+        const response = await fetch("/api/prospect/conversation",
+          {cache:"no-store",credentials:"same-origin"});
+        if (!response.ok) return;
+        const context = await response.json();
+        if (!Array.isArray(context.turns)) return;
+        verifiedProspect = true;
+        previousResponseId = null;
+        sessionStorage.removeItem("rentalAssistantResponseId");
+        if (["ziegler","virginia"].includes(context.propertyId)) {
+          currentPropertyId = context.propertyId;
+        }
+        for (const turn of context.turns) {
+          if (["user","assistant"].includes(turn.role) &&
+              typeof turn.content === "string") {
+            addMessage(turn.content, turn.role);
+          }
+        }
+        if (context.turns.length === 0) {
+          addMessage("Welcome back. I can help you continue with your " +
+            (context.propertyId === "ziegler" ? "Dearborn Heights" : "Detroit") +
+            " rental inquiry.", "assistant");
+        }
+        renderSuggestions();
+      } catch {
+        // Anonymous chat continues if the optional session feature is unavailable.
+      }
+    }
     const suggestionArea = document.getElementById("suggestions");
     const questionSuggestions = window.RentalAssistantSuggestions;
     let currentPropertyId = null;
@@ -494,6 +540,7 @@
       }
     }
     renderSuggestions();
+    restoreVerifiedProspect();
 
     function createTurn(role, bubble) {
       const turn = document.createElement("div");
@@ -601,7 +648,7 @@
           },
           body: JSON.stringify({
             message: question,
-            previousResponseId
+            previousResponseId: verifiedProspect ? null : previousResponseId
           })
         });
 
@@ -611,7 +658,7 @@
 
         const data = await response.json();
 
-        if (data.responseId) {
+        if (data.responseId && !verifiedProspect) {
           previousResponseId = data.responseId;
 
           sessionStorage.setItem(
