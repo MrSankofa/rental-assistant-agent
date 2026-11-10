@@ -30,7 +30,7 @@ function planTourMessages({ booking, engagement, contact, now = new Date() }) {
   const ends = Date.parse(booking.endsAt || "");
   const clock = new Date(now).getTime();
   if (![starts, ends, clock].every(Number.isFinite) || ends <= starts ||
-      ends <= clock) return [];
+      starts <= clock || ends <= clock) return [];
 
   // Confirmation and reminder have independent, stable identities.
   // A scheduler run inside the reminder window never invalidates confirmation.
