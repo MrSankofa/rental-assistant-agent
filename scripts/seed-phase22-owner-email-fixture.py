@@ -24,9 +24,9 @@ APPROVAL = "CREATE_ONE_PHASE22_OWNER_INBOX_FIXTURE"
 BASE = (f"https://firestore.googleapis.com/v1/projects/{PROJECT}/"
         f"databases/{DATABASE}/documents/scopes/{SCOPE}")
 sha = lambda x: hashlib.sha256(x.encode("utf8")).hexdigest()[:40]
-CONTACT_ID = "c_" + sha(SCOPE + "|" + EMAIL)
-ENGAGEMENT_ID = "e_" + sha(CONTACT_ID + "|rental|ziegler")
-BOOKING_ID = "b_" + sha("phase22-owner-inbox-v1")
+CONTACT_ID = "c_" + sha("phase22-owner-isolated-contact-v2|" + EMAIL)
+ENGAGEMENT_ID = "e_" + sha("phase22-owner-isolated-engagement-v2|" + CONTACT_ID)
+BOOKING_ID = "b_" + sha("phase22-owner-isolated-booking-v2")
 
 def command(*arguments):
     return subprocess.check_output(arguments, text=True).strip()
@@ -93,8 +93,8 @@ def main():
             "startsAt": fmt(start), "endsAt": fmt(start + timedelta(minutes=30))
         })
     ]
-    # Fail closed if owner identity already exists, because owner email may be
-    # associated with another CRM flow. Never take ownership of an existing record.
+    # Versioned fixture-specific IDs isolate this record from existing owner
+    # contacts. Refuse to overwrite even another test fixture.
     for collection, record in rows:
         if req("GET", collection, record["id"], bearer) is not None:
             sys.exit("REFUSED: record already exists; no changes made")
