@@ -4,6 +4,7 @@
 const crypto=require("node:crypto");
 const {StoreConflict}=require("./storage");
 const {verifyResendEvent}=require("./applicationResendWebhook");
+const {reconcileDeliveredInvitationStage}=require("./applicationStageSync");
 const {INBOX,JOB}=require("./applicationOwnerResend");
 const hash=s=>crypto.createHash("sha256").update(s).digest("hex");
 const reject=(reason,status=403)=>Object.assign(new Error(reason),{status});
@@ -58,11 +59,17 @@ async function applyVerifiedOwnerEvent(crm,event,{now=new Date()}={}){
     if(previous?.details?.eventHash!==eventHash || previous?.details?.taskId!==task.id)
       throw reject("Delivery audit conflict",409);
   }
-  return {outcome:prior?"duplicate":"confirmed",stageUnchanged:true};
+  return {outcome:prior?"duplicate":"confirmed",stageUnchanged:true,taskId:task.id};
 }
 async function handleSignedOwnerWebhook(crm,rawBody,headers,{env={},now=new Date()}={}){
   authorize(crm,env);
   const event=verifyResendEvent(rawBody,headers,env.RESEND_WEBHOOK_SIGNING_SECRET,{now});
-  return applyVerifiedOwnerEvent(crm,event,{now});
+  const result=await applyVerifiedOwnerEvent(crm,event,{now});
+  if(env.PHASE22_APPLICATION_CRM_SYNC_ENABLED!=="true" ||
+     event.type!=="email.delivered" || !result.taskId)return result;
+  // A receipt can be committed even if stage sync fails. Provider retries
+  // are safe because the stage bridge is idempotent.
+  const synced=await reconcileDeliveredInvitationStage(crm,result.taskId,{env,now});
+  return {...result,stageUnchanged:false,crmStage:synced.status};
 }
 module.exports={authorize,applyVerifiedOwnerEvent,handleSignedOwnerWebhook};
