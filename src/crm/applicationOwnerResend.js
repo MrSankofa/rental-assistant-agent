@@ -6,6 +6,7 @@ const {eligible,fingerprint}=require("./applicationDeliveryOutbox");
 const {composeApplicationInvitation}=require("./applicationInvitation");
 const {sendResendEmail}=require("./resendTransport");
 const {FROM}=require("./deliveryOutbox");
+const {getApplicationLink}=require("./propertyApplicationLinks");
 
 const JOB="rental-application-owner-email-staging";
 const INBOX="brett@altruisticdevelopment.com";
@@ -18,6 +19,7 @@ function authorize(crm,env){
     CRM_BACKEND:"firestore",CRM_SCOPE:"rental-staging",
     CRM_DATABASE:"rental-email-staging",CRM_DELIVERY_MODE:"disabled",
     CRM_PRODUCTION_EMAIL_ENABLED:"false",
+    PHASE22_PROPERTY_APPLICATION_LINKS_ENABLED:"true",
     PHASE22_APPLICATION_OWNER_APPROVAL:APPROVAL,
     PHASE22_APPLICATION_PROVIDER_APPROVAL:PROVIDER_APPROVAL,
     PHASE22_APPLICATION_OWNER_TO:INBOX
@@ -46,6 +48,13 @@ function ownerOnly(task,ctx){
     ctx.booking?.id===task.bookingId &&
     task.recipientContactId===ctx.contact?.id;
 }
+async function currentPropertyLink(crm,task,ctx){
+  if(!ctx.booking || !ctx.engagement ||
+     ctx.booking.propertyId!==ctx.engagement.targetId) return false;
+  const link=await getApplicationLink(crm,ctx.booking.propertyId);
+  return link.active===true && typeof link.url==="string" &&
+    link.url===task.applicationUrl;
+}
 async function markUncertain(crm,taskId,reason){
  try{
   const row=await crm.store.get("tasks",taskId);
@@ -70,6 +79,8 @@ async function deliverOwnerApplication(crm,taskId,{
  if(!ownerOnly(row.value,ctx))return {outcome:"skipped",reason:"not-owner-fixture"};
  const reason=eligible(row.value,ctx,now);
  if(reason)return {outcome:"skipped",reason};
+ if(!(await currentPropertyLink(crm,row.value,ctx)))
+   return {outcome:"skipped",reason:"property-link-inactive-or-changed"};
  const key="p22-app-owner-"+taskId;
  const next={...row.value,status:"application-owner-delivery-reserved",
   delivery:{status:"reserved",mode:"owner-provider-test",idempotencyKey:key,
@@ -85,7 +96,8 @@ async function deliverOwnerApplication(crm,taskId,{
       current.delivery?.status!=="reserved" ||
       !ownerOnly(row.value,latest) ||
       eligible(row.value,latest,now) ||
-      current.delivery.fingerprint!==fingerprint(row.value,latest.contact)){
+      current.delivery.fingerprint!==fingerprint(row.value,latest.contact) ||
+      !(await currentPropertyLink(crm,row.value,latest))){
      await markUncertain(crm,taskId,"eligibility-or-reservation-changed");
      return {outcome:"needs-reconciliation"};
    }
