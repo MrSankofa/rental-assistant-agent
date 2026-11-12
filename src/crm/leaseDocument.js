@@ -40,10 +40,13 @@ function inspectTemplateText(text) {
     ? remaining.slice(0, end)
     : "";
 
-  const depositAmbiguous =
+  // A lease may omit the optional holding-deposit clause.
+  // If present, the clause must use a distinct placeholder.
+  const depositAmbiguous = start >= 0 && (
     !holdingSection ||
     holdingSection.includes("<<depositAmount>>") ||
-    !holdingSection.includes("<<holdingDepositAmount>>");
+    !holdingSection.includes("<<holdingDepositAmount>>")
+  );
 
   return {
     placeholders: [...new Set(tokens)].sort(),

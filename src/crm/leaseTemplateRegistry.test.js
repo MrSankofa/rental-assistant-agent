@@ -10,9 +10,38 @@ const {
 } = require("./leaseTemplateRegistry");
 
 function docx(byte = 1) {
-  const buffer = Buffer.alloc(1500, byte);
-  buffer.write("PK\x03\x04", 0, "binary");
-  return buffer;
+  const PizZip = require("pizzip");
+
+  const fields = [
+    "tenantName", "tenantEmail", "rentAmount",
+    "depositAmount", "totalAmount",
+    "startDate", "endDate"
+  ];
+
+  const paragraphs = fields.map(field =>
+    `<w:p><w:r><w:t>&lt;&lt;${field}&gt;&gt;</w:t></w:r></w:p>`
+  ).join("");
+
+  const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/' +
+    'wordprocessingml/2006/main"><w:body>' +
+    paragraphs +
+    `<w:p><w:r><w:t>Fixture ${byte}</w:t></w:r></w:p>` +
+    '</w:body></w:document>';
+
+  const types = '<?xml version="1.0"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/' +
+    'package/2006/content-types">' +
+    '<Override PartName="/word/document.xml" ' +
+    'ContentType="application/vnd.openxmlformats-officedocument.' +
+    'wordprocessingml.document.main+xml"/>' +
+    '</Types>';
+
+  return new PizZip()
+    .file("[Content_Types].xml", types)
+    .file("_rels/.rels", "<Relationships/>")
+    .file("word/document.xml", xml)
+    .generate({type: "nodebuffer"});
 }
 
 function add(registry, propertyId, document) {

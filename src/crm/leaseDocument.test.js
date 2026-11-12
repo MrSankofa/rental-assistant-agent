@@ -53,12 +53,12 @@ describe("Phase 23D document safety", () => {
     expect(result.depositAmbiguous).toBe(true);
   });
 
-  test("fails closed when holding section cannot be identified", () => {
+  test("does not mistake a security deposit for a holding deposit", () => {
     const result = inspectTemplateText(
       "Security deposit: <<depositAmount>>"
     );
 
-    expect(result.depositAmbiguous).toBe(true);
+    expect(result.depositAmbiguous).toBe(false);
   });
 
   test("accepts a separate holding deposit marker", () => {
@@ -69,6 +69,23 @@ describe("Phase 23D document safety", () => {
     );
 
     expect(result.depositAmbiguous).toBe(false);
+  });
+
+  test("accepts a lease without a holding deposit section", () => {
+    const result = inspectTemplateText(
+      "Security Deposit: <<depositAmount>> " +
+      "Total Due: <<totalAmount>>"
+    );
+    expect(result.depositAmbiguous).toBe(false);
+  });
+
+  test("rejects an ambiguous holding deposit clause", () => {
+    const result = inspectTemplateText(
+      "Holding Deposit " +
+      "Tenant paid <<depositAmount>> " +
+      "Location of Deposit"
+    );
+    expect(result.depositAmbiguous).toBe(true);
   });
 
   test("rejects missing staff confirmation", () => {

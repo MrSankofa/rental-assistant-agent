@@ -1,6 +1,9 @@
 "use strict";
 
 const crypto = require("crypto");
+const {
+  validateLeaseTemplate
+} = require("./leaseTemplateValidation");
 
 const PROPERTIES = new Set(["ziegler", "virginia"]);
 
@@ -61,6 +64,9 @@ function registerTemplate({
   reference(uploadedBy, "uploader");
   reference(storageReference, "storage reference");
 
+  const validation = validateLeaseTemplate(
+    document, propertyId
+  );
   const hash = sha256(document);
 
   const existing = registry.versions.find(
@@ -78,6 +84,7 @@ function registerTemplate({
     sha256: hash,
     storageReference,
     uploadedBy,
+    validation,
     status: "pending-review",
     legalReviewReference: null,
     ownerApprovalReference: null
@@ -114,6 +121,10 @@ function approveTemplate({
 
     if (version.status !== "pending-review") {
       fail("Template is not pending review", 409);
+    }
+
+    if (version.validation?.needsLegalReview) {
+      fail("Legal-review markers remain in template", 409);
     }
 
     found = true;
