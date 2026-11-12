@@ -15,6 +15,7 @@ const {recordTourOutcome} = require("./src/crm/tourOutcomeAutomation");
 const {approveInvitationForReview} = require("./src/crm/applicationInvitation");
 const {PROPERTIES,getApplicationLink,setApplicationLink}=require("./src/crm/propertyApplicationLinks");
 const {prepareAwaitingInvitation}=require("./src/crm/awaitingApplicationLink");
+const {enabled: stagingPropertyLinkAcceptanceEnabled}=require("./src/crm/stagingPropertyLinkAcceptance");
 const { featureEnabled: reminderStaffEnabled, decideReminder } =
   require("./src/crm/staffReminderActions");
 const { makeStore } = require("./src/crm/storage");
@@ -215,9 +216,10 @@ const server = http.createServer(async (req, res) => {
         dashboard.applicationInvitationApprovalEnabled = liveStaffMode &&
           actionsEnabled(process.env) &&
           process.env.PHASE22_APPLICATION_INVITATIONS_ENABLED === "true";
-        dashboard.propertyApplicationLinksEnabled = liveStaffMode &&
+        dashboard.propertyApplicationLinksEnabled = (liveStaffMode &&
           actionsEnabled(process.env) &&
-          process.env.PHASE22_PROPERTY_APPLICATION_LINKS_ENABLED === "true";
+          process.env.PHASE22_PROPERTY_APPLICATION_LINKS_ENABLED === "true") ||
+          stagingPropertyLinkAcceptanceEnabled(process.env);
         dashboard.propertyApplicationLinks = dashboard.propertyApplicationLinksEnabled
           ? await Promise.all(Object.keys(PROPERTIES).map(id=>getApplicationLink(crm,id)))
           : [];
@@ -367,6 +369,29 @@ const server = http.createServer(async (req, res) => {
     // Cloud Run IAM is the authentication perimeter of this private staff service.
     if (req.method === "POST" && !requireStagingOrigin(req.headers.origin,allowedOrigin)) {
       sendJson(res,403,{error:"Origin not allowed"});return;
+    }
+    // Isolated staging property-link acceptance only. Existing origin guard
+    // above must execute first. Cloud Run invoker IAM stays enabled.
+    const stagingLinkPath=pathname.match(
+      /^\/api\/staff\/properties\/(ziegler|virginia)\/application-link$/
+    );
+    if (req.method === "POST" && stagingLinkPath &&
+        stagingPropertyLinkAcceptanceEnabled(process.env)) {
+      const body=await readJsonBody(req,res,4096);
+      if (!body) return;
+      try {
+        const result=await setApplicationLink(crm,stagingLinkPath[1],body,{
+          env:process.env,
+          // Fixed synthetic actor, never a claim of verified human identity.
+          actor:"staff:accounts.google.com:999999999999"
+        });
+        sendJson(res,200,result);
+      } catch(error) {
+        sendJson(res,error.status||500,{
+          error:error.status?error.message:"Staging property link update unavailable"
+        });
+      }
+      return;
     }
     if (req.method === "POST" && pathname === "/api/staff/followups/run") {
       try { sendJson(res,200,await generateFollowupTasks(crm)); }

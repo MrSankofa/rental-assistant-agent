@@ -207,7 +207,7 @@ async function reload(){
   q("staffTaskCards").replaceChildren();
   q("legacyTaskTable").hidden=live;
   const linksSection=q("applicationLinkSection");
-  linksSection.hidden=!(live && data.propertyApplicationLinksEnabled===true);
+  linksSection.hidden=!(data.propertyApplicationLinksEnabled===true);
   q("propertyApplicationLinks").replaceChildren();
   if(!linksSection.hidden){
     for(const link of (data.propertyApplicationLinks||[])){
