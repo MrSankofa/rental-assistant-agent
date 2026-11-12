@@ -46,9 +46,15 @@ describe("signed Resend owner-only receipt integration",()=>{
   await expect(handleSignedOwnerWebhook(t.crm,Buffer.from(raw.toString().replace("delivered","bounced")),headers,{env,now})).rejects.toMatchObject({status:401});
   expect((await t.store.get("tasks",tid)).value.status).toBe("application-provider-accepted");
  });
- test("wrong provider ID fails closed",async()=>{
+ test("unrelated authenticated delivery is ignored without mutations",async()=>{
   const t=await setup();const [raw,headers]=signed("email.delivered","other-provider-id");
-  await expect(handleSignedOwnerWebhook(t.crm,raw,headers,{env,now})).rejects.toMatchObject({status:409});
+  expect(await handleSignedOwnerWebhook(t.crm,raw,headers,{env,now}))
+    .toMatchObject({outcome:"ignored"});
+  expect((await t.store.get("tasks",tid)).value.status)
+    .toBe("application-provider-accepted");
+  expect((await t.store.get("engagements","e_owner001")).value.stage)
+    .toBe("TOUR_SCHEDULED");
+  expect(await t.store.list("audits")).toHaveLength(0);
  });
  test("non-delivery event is ignored",async()=>{
   const t=await setup();const [raw,headers]=signed("email.opened");

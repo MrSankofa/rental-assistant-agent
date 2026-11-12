@@ -31,6 +31,9 @@ async function applyVerifiedOwnerEvent(crm,event,{now=new Date()}={}){
     t.delivery?.status==="accepted" &&
     t.delivery?.providerId===event.providerId &&
     ["application-provider-accepted","application-delivery-confirmed"].includes(t.status));
+  // Other Resend emails can legitimately reach this endpoint.
+  // Only a signed event matching our owner-only delivery is actionable.
+  if(matches.length===0)return {outcome:"ignored"};
   if(matches.length!==1)throw reject("Receipt not uniquely matched",409);
   const task=matches[0];
   const contact=(await crm.store.get("contacts",task.recipientContactId))?.value;
