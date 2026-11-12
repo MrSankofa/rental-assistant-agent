@@ -29,5 +29,9 @@
   "homepage": "https://github.com/MrSankofa/rental-assistant-agent#readme",
   "engines": {
     "node": ">=22 <23"
+  },
+  "dependencies": {
+    "docxtemplater": "3.71.1",
+    "pizzip": "3.3.0"
   }
 }
