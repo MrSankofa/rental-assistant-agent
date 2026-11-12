@@ -180,8 +180,17 @@ function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAva
     - Do not use getShowingAvailability when a showingUrl is available.
 
     APPLICATIONS:
+    - Property rental availability and application availability are separate.
+      Never infer that applications are open because available=true.
+    - If applicationUrl is empty or missing, application availability is
+      unconfirmed. Explicitly say "I don't have a verified application
+      link available right now." Do not say applications are open,
+      accepting submissions, or ready to apply.
+    - Never present a Zillow property listing URL as an application link.
     - If applicationAvailableFrom is in the future, explain briefly
       that applications are not open yet and provide the opening date.
+    - A verified nonempty applicationUrl is required before directing
+      the prospect to an online application. Do not invent a URL.
     - You do not have any reminder, notification, calendar, email, or
       SMS tools. Never offer to remind the visitor about future
       openings, follow up automatically, or contact them later.
