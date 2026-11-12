@@ -1,0 +1,181 @@
+"use strict";
+
+const APPLICANT_FIELDS = Object.freeze([
+  "tenantName",
+  "tenantPrevAddress",
+  "tenantPhone",
+  "tenantEmail"
+]);
+
+const OWNER_FIELDS = Object.freeze([
+  "rentAmount",
+  "depositAmount",
+  "holdingDepositAmount",
+  "totalAmount",
+  "startDate",
+  "endDate"
+]);
+
+const DETROIT_APPLICANT_FIELDS = Object.freeze([
+  "guarantorName",
+  "guarantorRelationship",
+  "guarantorAddress",
+  "guarantorPhone",
+  "guarantorEmail"
+]);
+
+const DETROIT_OWNER_FIELDS = Object.freeze([
+  "roomNumber"
+]);
+
+const MONEY = new Set([
+  "rentAmount",
+  "depositAmount",
+  "holdingDepositAmount",
+  "totalAmount"
+]);
+
+function fail(message, status = 400) {
+  throw Object.assign(new Error(message), {status});
+}
+
+function requiredFields(propertyId) {
+  if (!["ziegler", "virginia"].includes(propertyId)) {
+    fail("Unsupported rental property", 409);
+  }
+
+  const detroit = propertyId === "virginia";
+
+  return {
+    applicant: [
+      ...APPLICANT_FIELDS,
+      ...(detroit ? DETROIT_APPLICANT_FIELDS : [])
+    ],
+    owner: [
+      ...OWNER_FIELDS,
+      ...(detroit ? DETROIT_OWNER_FIELDS : [])
+    ]
+  };
+}
+
+function validDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const date = new Date(value + "T00:00:00Z");
+
+  return Number.isFinite(date.getTime()) &&
+    date.toISOString().slice(0, 10) === value;
+}
+
+function validateValue(key, value) {
+  if (typeof value !== "string" ||
+      !value.trim() ||
+      value.length > 300 ||
+      /[\r\n{}<>]/.test(value)) {
+    fail("Invalid lease field: " + key);
+  }
+
+  if (MONEY.has(key)) {
+    if (!/^\d{1,8}(?:\.\d{1,2})?$/.test(value)) {
+      fail("Invalid monetary amount: " + key);
+    }
+  }
+
+  if (["startDate", "endDate"].includes(key) &&
+      !validDate(value)) {
+    fail("Invalid lease date: " + key);
+  }
+
+  if (key === "tenantEmail" ||
+      key === "guarantorEmail") {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      fail("Invalid email field: " + key);
+    }
+  }
+
+  if (key === "roomNumber" &&
+      !/^[A-Za-z0-9-]{1,20}$/.test(value)) {
+    fail("Invalid room number");
+  }
+}
+
+function planLeaseReadiness({engagement, fields = {}} = {}) {
+  if (
+    !engagement ||
+    engagement.domain !== "rental" ||
+    engagement.stage !== "APPROVED" ||
+    engagement.handoff?.decision?.status !== "approved" ||
+    !engagement.handoff.decision.reference
+  ) {
+    fail("Recorded landlord approval required", 409);
+  }
+
+  const required = requiredFields(engagement.targetId);
+
+  if (!fields || typeof fields !== "object" ||
+      Array.isArray(fields)) {
+    fail("Invalid lease fields");
+  }
+
+  const allowed = new Set([
+    ...required.applicant,
+    ...required.owner
+  ]);
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (!allowed.has(key)) {
+      fail("Unknown lease field: " + key);
+    }
+
+    if (value !== null && value !== undefined &&
+        value !== "") {
+      validateValue(key, value);
+    }
+  }
+
+  if (fields.startDate && fields.endDate &&
+      fields.startDate >= fields.endDate) {
+    fail("Lease end date must follow start date");
+  }
+
+  const missingApplicantFields = required.applicant.filter(
+    key => !fields[key]
+  );
+
+  const missingOwnerFields = required.owner.filter(
+    key => !fields[key]
+  );
+
+  const missingFields = [
+    ...missingApplicantFields,
+    ...missingOwnerFields
+  ];
+
+  return {
+    engagementId: engagement.id,
+    propertyId: engagement.targetId,
+    status: missingFields.length
+      ? "information-required"
+      : "template-review-required",
+    missingFields,
+    missingApplicantFields,
+    missingOwnerFields,
+    collectionRequest: {
+      recipientType: "approved-applicant",
+      status: "draft-not-sent",
+      fields: missingApplicantFields,
+      sent: false,
+      deliveryEnabled: false
+    },
+    canGenerateLease: false,
+    requiresOwnerApproval: true,
+    signingMode: "manual-docusign-upload",
+    documentFormat: "docx",
+    signaturePlacement: "manual"
+  };
+}
+
+module.exports = {
+  requiredFields,
+  planLeaseReadiness
+};
