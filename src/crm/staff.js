@@ -71,7 +71,7 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
       summary:t.summary,dueAt:t.dueAt,draft:t.draft||"",
       draftOrigin:t.draftOrigin||"template",deliveryStatus:t.delivery?.status||"not-sent",
       approved:Boolean(t.approved),automatedDelivery:false,
-      source:t.source||"",
+      source:t.source||"",type:t.type||"",
       policyVersion:t.policyVersion||"",
       staffResolution:t.staffResolution||null
     }))

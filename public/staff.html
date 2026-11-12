@@ -703,6 +703,38 @@ async function reload(){
 
        card.append(title,due,status,delivery);
 
+       if(data.applicationInvitationApprovalEnabled===true &&
+          t.source==="phase22-tour-outcome" &&
+          t.status==="pending-approval" &&
+          t.type==="APPLICATION_INVITATION_REVIEW"){
+         const form=document.createElement("form");
+         form.className="staff-milestone-form";
+         const label=document.createElement("label");
+         const checkbox=document.createElement("input");
+         checkbox.type="checkbox";
+         checkbox.required=true;
+         label.append(checkbox,"I reviewed this invitation. Approval does not send email.");
+         const approve=document.createElement("button");
+         approve.type="submit";
+         approve.textContent="Approve invitation for delivery review";
+         form.append(label,approve);
+         form.addEventListener("submit",async event=>{
+           event.preventDefault();
+           if(!checkbox.checked || !form.reportValidity())return;
+           if(!confirm("Approve this Zillow invitation for delivery review? No email will be sent."))return;
+           approve.disabled=true;
+           try{
+             await json("/api/staff/tasks/"+encodeURIComponent(t.id)+
+               "/approve-application-invitation",{
+               method:"POST",headers:{"Content-Type":"application/json"},
+               body:JSON.stringify({confirmed:true})
+             });
+             await reload();
+           }catch(error){message(error.message);approve.disabled=false;}
+         });
+         card.appendChild(form);
+       }
+
        if(t.staffResolution){
          const resolution=document.createElement("p");
          resolution.className="muted";

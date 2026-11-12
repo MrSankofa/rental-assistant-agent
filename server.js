@@ -12,6 +12,7 @@ const { loadConversation, appendConversation } = require("./src/crm/prospectConv
 
 const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
 const {recordTourOutcome} = require("./src/crm/tourOutcomeAutomation");
+const {approveInvitationForReview} = require("./src/crm/applicationInvitation");
 const { featureEnabled: reminderStaffEnabled, decideReminder } =
   require("./src/crm/staffReminderActions");
 const { makeStore } = require("./src/crm/storage");
@@ -209,6 +210,9 @@ const server = http.createServer(async (req, res) => {
         dashboard.outcomeActionsEnabled = liveStaffMode &&
           actionsEnabled(process.env) &&
           process.env.PHASE22_TOUR_OUTCOMES_ENABLED === "true";
+        dashboard.applicationInvitationApprovalEnabled = liveStaffMode &&
+          actionsEnabled(process.env) &&
+          process.env.PHASE22_APPLICATION_INVITATIONS_ENABLED === "true";
         dashboard.outcomeBookings = dashboard.outcomeActionsEnabled
           ? (await crm.store.list("bookings",200)).filter(b =>
               b.provider === "calendly" &&
@@ -233,6 +237,12 @@ const server = http.createServer(async (req, res) => {
     }
     // Live actions remain disabled unless explicitly released on the private service.
     if (liveStaffMode) {
+      const invitationPath = pathname.match(
+        /^\/api\/staff\/tasks\/(to_[a-f0-9]{40})\/approve-application-invitation$/
+      );
+      const invitationRequest = Boolean(invitationPath &&
+        actionsEnabled(process.env) &&
+        process.env.PHASE22_APPLICATION_INVITATIONS_ENABLED === "true");
       const outcomePath = pathname.match(
         /^\/api\/staff\/bookings\/([a-zA-Z0-9_-]{8,120})\/outcome$/
       );
@@ -252,7 +262,7 @@ const server = http.createServer(async (req, res) => {
         stagePath && actionsEnabled(process.env)
       );
       if (req.method !== "POST" ||
-          (!reminderRequest && !milestoneRequest && !outcomeRequest)) {
+          (!reminderRequest && !milestoneRequest && !outcomeRequest && !invitationRequest)) {
         sendJson(res,403,{error:"Live staff actions disabled"});
         return;
       }
@@ -282,6 +292,14 @@ const server = http.createServer(async (req, res) => {
       if (!body) return;
 
       try {
+        if (invitationRequest) {
+          const result=await approveInvitationForReview(
+            crm,invitationPath[1],
+            {env:process.env,actor:verifiedStaff.actor,confirmed:body.confirmed}
+          );
+          sendJson(res,200,result);
+          return;
+        }
         if (outcomeRequest) {
           const result=await recordTourOutcome(crm,
             {...body,bookingId:outcomePath[1]},
