@@ -43,10 +43,10 @@ export const properties: Record<string, Property> = {
     parking: "Driveway and two-car garage",
     leaseTerm: "12 months",
 
-    applicationUrl:
-      "https://www.zillow.com/homedetails/4932-Ziegler-St-Dearborn-Heights-MI-48125/88094499_zpid/?view=public",
-
-    applicationAvailableFrom: "2026-10-24",
+    // Applications are offered only through verified staff-controlled links.
+    // A Zillow listing URL is not automatically an application URL.
+    applicationUrl: "",
+    applicationAvailableFrom: null,
 
     showingUrl:
       "https://calendly.com/altruistic-re/dearborn-heights-rental",
