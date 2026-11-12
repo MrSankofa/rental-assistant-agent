@@ -511,6 +511,59 @@ async function reload(){
     }
    }
 
+   if(live && data.outcomeActionsEnabled===true &&
+      e.stage==="TOUR_SCHEDULED") {
+     const bookings=(data.outcomeBookings||[]).filter(b=>
+       b.engagementId===e.id);
+     for(const booking of bookings){
+       const form=document.createElement("form");
+       form.className="staff-milestone-form";
+       const heading=document.createElement("p");
+       heading.textContent="Record tour outcome: "+stamp(booking.startsAt);
+       const choice=document.createElement("select");
+       choice.setAttribute("aria-label","Tour outcome");
+       for(const [value,label] of [
+         ["attended-interested","Attended - wants to apply"],
+         ["attended-not-interested","Attended - not interested"],
+         ["no-show","No-show"],
+         ["needs-follow-up","Needs follow-up"]])
+         choice.add(new Option(label,value));
+       const url=document.createElement("input");
+       url.type="url";url.required=true;url.maxLength=500;
+       url.placeholder="Official Zillow application URL";
+       url.setAttribute("aria-label","Zillow application URL");
+       const evidence=document.createElement("textarea");
+       evidence.required=true;evidence.minLength=10;evidence.maxLength=300;
+       evidence.placeholder="Staff-observed tour outcome (10-300 characters)";
+       const confirmation=document.createElement("label");
+       const checked=document.createElement("input");
+       checked.type="checkbox";checked.required=true;
+       confirmation.append(checked,"I independently confirmed this outcome");
+       const submit=document.createElement("button");
+       submit.type="submit";submit.textContent="Record outcome (no email sent)";
+       const update=()=>{url.hidden=choice.value!=="attended-interested";
+         url.required=!url.hidden;};
+       choice.addEventListener("change",update);update();
+       form.append(heading,choice,url,evidence,confirmation,submit);
+       form.addEventListener("submit",async event=>{
+         event.preventDefault();
+         if(!form.reportValidity() || !checked.checked)return;
+         if(!confirm("Record the verified tour outcome? This does not send an email."))return;
+         submit.disabled=true;
+         try{
+           await json("/api/staff/bookings/"+
+             encodeURIComponent(booking.id)+"/outcome",{
+             method:"POST",headers:{"Content-Type":"application/json"},
+             body:JSON.stringify({outcome:choice.value,
+               evidence:evidence.value,confirmed:true,
+               ...(url.required?{applicationUrl:url.value}:{})})
+           });
+           await reload();
+         }catch(error){message(error.message);submit.disabled=false;}
+       });
+       controls.appendChild(form);
+     }
+   }
    if(next && !live){
     const action=document.createElement("button");
     action.textContent=next==="TOUR_OFFERED"?"Mark tour offered":"Confirm tour scheduled";

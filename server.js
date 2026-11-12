@@ -11,6 +11,7 @@ const { loadConversation, appendConversation } = require("./src/crm/prospectConv
 
 
 const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
+const {recordTourOutcome} = require("./src/crm/tourOutcomeAutomation");
 const { featureEnabled: reminderStaffEnabled, decideReminder } =
   require("./src/crm/staffReminderActions");
 const { makeStore } = require("./src/crm/storage");
@@ -205,6 +206,18 @@ const server = http.createServer(async (req, res) => {
           {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging",actionsEnabled:liveStaffMode&&actionsEnabled(process.env)});
         dashboard.reminderStaffActionsEnabled =
           liveStaffMode && reminderStaffEnabled(process.env);
+        dashboard.outcomeActionsEnabled = liveStaffMode &&
+          actionsEnabled(process.env) &&
+          process.env.PHASE22_TOUR_OUTCOMES_ENABLED === "true";
+        dashboard.outcomeBookings = dashboard.outcomeActionsEnabled
+          ? (await crm.store.list("bookings",200)).filter(b =>
+              b.provider === "calendly" &&
+              b.status === "scheduled" &&
+              b.crmSyncStatus === "completed" &&
+              Number.isFinite(Date.parse(b.endsAt)) &&
+              Date.parse(b.endsAt) <= Date.now()
+            ).map(b => ({id:b.id,engagementId:b.engagementId,
+              startsAt:b.startsAt,endsAt:b.endsAt})) : [];
         dashboard.reminders = liveStaffMode
           ? overlayReminderStatus(
               planTourReminders(
@@ -220,6 +233,12 @@ const server = http.createServer(async (req, res) => {
     }
     // Live actions remain disabled unless explicitly released on the private service.
     if (liveStaffMode) {
+      const outcomePath = pathname.match(
+        /^\/api\/staff\/bookings\/([a-zA-Z0-9_-]{8,120})\/outcome$/
+      );
+      const outcomeRequest = Boolean(outcomePath &&
+        actionsEnabled(process.env) &&
+        process.env.PHASE22_TOUR_OUTCOMES_ENABLED === "true");
       const reminderPath = pathname.match(
         /^\/api\/staff\/reminders\/(tr_[0-9a-f]{40})\/decision$/
       );
@@ -233,7 +252,7 @@ const server = http.createServer(async (req, res) => {
         stagePath && actionsEnabled(process.env)
       );
       if (req.method !== "POST" ||
-          (!reminderRequest && !milestoneRequest)) {
+          (!reminderRequest && !milestoneRequest && !outcomeRequest)) {
         sendJson(res,403,{error:"Live staff actions disabled"});
         return;
       }
@@ -263,6 +282,13 @@ const server = http.createServer(async (req, res) => {
       if (!body) return;
 
       try {
+        if (outcomeRequest) {
+          const result=await recordTourOutcome(crm,
+            {...body,bookingId:outcomePath[1]},
+            {env:process.env,actor:verifiedStaff.actor});
+          sendJson(res,200,result);
+          return;
+        }
         if (reminderRequest) {
           const result=await decideReminder(
             crm,reminderPath[1],body,verifiedStaff.actor
