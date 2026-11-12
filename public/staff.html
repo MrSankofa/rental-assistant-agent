@@ -152,6 +152,11 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
 <h2 id="overviewTitle">Rental pipeline overview</h2>
 <div id="overview" aria-live="polite"></div>
 </section>
+<section id="applicationLinkSection" hidden>
+<h2>Property application links</h2>
+<p class="muted">Manage official Zillow application links. Changes do not send email or approve existing invitations.</p>
+<div id="propertyApplicationLinks" class="staff-task-grid"></div>
+</section>
 <section><h2>Prospect pipeline</h2>
 <div class="filters">
 <label>Property
@@ -201,6 +206,44 @@ async function reload(){
   q("legacyPipelineTable").hidden=live;
   q("staffTaskCards").replaceChildren();
   q("legacyTaskTable").hidden=live;
+  const linksSection=q("applicationLinkSection");
+  linksSection.hidden=!(live && data.propertyApplicationLinksEnabled===true);
+  q("propertyApplicationLinks").replaceChildren();
+  if(!linksSection.hidden){
+    for(const link of (data.propertyApplicationLinks||[])){
+      const card=document.createElement("article");
+      card.className="staff-task-card";
+      const heading=document.createElement("h3");heading.textContent=link.propertyName;
+      const state=document.createElement("p");
+      state.textContent=link.active?"Active for invitation review":"Inactive - invitations blocked";
+      const form=document.createElement("form");form.className="staff-milestone-form";
+      const input=document.createElement("input");input.type="url";
+      input.maxLength=500;input.placeholder="Official Zillow HTTPS application URL";
+      input.setAttribute("aria-label",link.propertyName+" Zillow application URL");
+      input.value=link.url||"";
+      const choice=document.createElement("select");
+      choice.setAttribute("aria-label",link.propertyName+" link status");
+      choice.add(new Option("Inactive","false"));choice.add(new Option("Active","true"));
+      choice.value=String(link.active);
+      const confirmation=document.createElement("label");
+      const checked=document.createElement("input");checked.type="checkbox";checked.required=true;
+      confirmation.append(checked,"I verified this property link and its current listing status");
+      const save=document.createElement("button");save.type="submit";save.textContent="Save property link";
+      form.append(input,choice,confirmation,save);
+      form.addEventListener("submit",async event=>{
+        event.preventDefault();if(!form.reportValidity()||!checked.checked)return;
+        if(!confirm("Save application link configuration? No invitations will be sent."))return;
+        save.disabled=true;
+        try{
+          await json("/api/staff/properties/"+encodeURIComponent(link.propertyId)+"/application-link",{
+            method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({url:input.value.trim()||null,active:choice.value==="true",confirmed:true})
+          });await reload();
+        }catch(error){message(error.message);save.disabled=false;}
+      });
+      card.append(heading,state,form);q("propertyApplicationLinks").appendChild(card);
+    }
+  }
   const overview=data.overview||{};
   const tiles=[
     ["Total prospects",overview.total||0],
@@ -529,8 +572,9 @@ async function reload(){
          ["needs-follow-up","Needs follow-up"]])
          choice.add(new Option(label,value));
        const url=document.createElement("input");
-       url.type="url";url.required=true;url.maxLength=500;
-       url.placeholder="Official Zillow application URL";
+       url.type="url";url.required=data.propertyApplicationLinksEnabled!==true;url.maxLength=500;
+       url.placeholder=data.propertyApplicationLinksEnabled===true?
+         "Optional: leave blank to await your property link":"Official Zillow application URL";
        url.setAttribute("aria-label","Zillow application URL");
        const evidence=document.createElement("textarea");
        evidence.required=true;evidence.minLength=10;evidence.maxLength=300;
@@ -542,7 +586,7 @@ async function reload(){
        const submit=document.createElement("button");
        submit.type="submit";submit.textContent="Record outcome (no email sent)";
        const update=()=>{url.hidden=choice.value!=="attended-interested";
-         url.required=!url.hidden;};
+         url.required=!url.hidden && data.propertyApplicationLinksEnabled!==true;};
        choice.addEventListener("change",update);update();
        form.append(heading,choice,url,evidence,confirmation,submit);
        form.addEventListener("submit",async event=>{
@@ -556,7 +600,7 @@ async function reload(){
              method:"POST",headers:{"Content-Type":"application/json"},
              body:JSON.stringify({outcome:choice.value,
                evidence:evidence.value,confirmed:true,
-               ...(url.required?{applicationUrl:url.value}:{})})
+               ...(!url.hidden && url.value.trim()?{applicationUrl:url.value.trim()}:{})})
            });
            await reload();
          }catch(error){message(error.message);submit.disabled=false;}
@@ -703,6 +747,24 @@ async function reload(){
 
        card.append(title,due,status,delivery);
 
+       if(data.propertyApplicationLinksEnabled===true &&
+          t.source==="phase22-tour-outcome" &&
+          t.status==="awaiting-application-link" &&
+          t.type==="APPLICATION_INVITATION_REVIEW"){
+         const btn=document.createElement("button");btn.type="button";
+         btn.textContent="Prepare invitation using active property link";
+         btn.addEventListener("click",async()=>{
+           if(!confirm("Prepare this invitation for staff review? No email will be sent."))return;
+           btn.disabled=true;
+           try{
+             await json("/api/staff/tasks/"+encodeURIComponent(t.id)+"/prepare-application-link",{
+               method:"POST",headers:{"Content-Type":"application/json"},
+               body:JSON.stringify({confirmed:true})
+             });await reload();
+           }catch(error){message(error.message);btn.disabled=false;}
+         });
+         card.appendChild(btn);
+       }
        if(data.applicationInvitationApprovalEnabled===true &&
           t.source==="phase22-tour-outcome" &&
           t.status==="pending-approval" &&

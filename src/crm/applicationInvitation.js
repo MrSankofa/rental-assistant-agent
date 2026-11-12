@@ -93,6 +93,12 @@ async function approveInvitationForReview(crm,taskId,{
   const context=await readContext(crm,row.value);
   const reason=eligibility(row.value,context,now);
   if(reason) throw failure("Invitation is not eligible: "+reason,409);
+  if(env.PHASE22_PROPERTY_APPLICATION_LINKS_ENABLED==="true"){
+    const {getApplicationLink}=require("./propertyApplicationLinks");
+    const link=await getApplicationLink(crm,context.engagement.targetId);
+    if(!link.active || link.url!==row.value.applicationUrl)
+      throw failure("Active property application link does not match invitation",409);
+  }
   const preview=composeApplicationInvitation(row.value,context.contact,context.engagement);
   const at=new Date(now).toISOString();
   const updated={...row.value,

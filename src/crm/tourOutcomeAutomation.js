@@ -65,7 +65,10 @@ async function recordTourOutcome(crm,input,{env={},actor="",now=new Date()}={}) 
      Date.parse(booking.endsAt)>ms)
     throw fail("Tour not eligible for outcome recording",409);
 
-  const url=input.outcome==="attended-interested"
+  const awaitingLink=input.outcome==="attended-interested" &&
+    env.PHASE22_PROPERTY_APPLICATION_LINKS_ENABLED==="true" &&
+    (input.applicationUrl===undefined || input.applicationUrl===null || input.applicationUrl==="");
+  const url=input.outcome==="attended-interested" && !awaitingLink
     ? validateZillowUrl(input.applicationUrl):null;
   const canEmail=contact.preferredChannel==="email" &&
     contact.consent?.recording===true &&
@@ -88,7 +91,7 @@ async function recordTourOutcome(crm,input,{env={},actor="",now=new Date()}={}) 
     recipientContactId:contact.id,scheduledStart:booking.startsAt,
     outcome:input.outcome,type,applicationUrl:url,
     evidence:input.evidence.trim(),actor,
-    owner:"staff",status:"pending-approval",approved:false,
+    owner:"staff",status:awaitingLink && canEmail?"awaiting-application-link":"pending-approval",approved:false,
     automatedDelivery:false,deliveryEnabled:false,
     routing:"staff-review",createdAt:new Date(ms).toISOString(),
     dueAt:new Date(ms).toISOString()

@@ -13,6 +13,8 @@ const { loadConversation, appendConversation } = require("./src/crm/prospectConv
 const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
 const {recordTourOutcome} = require("./src/crm/tourOutcomeAutomation");
 const {approveInvitationForReview} = require("./src/crm/applicationInvitation");
+const {PROPERTIES,getApplicationLink,setApplicationLink}=require("./src/crm/propertyApplicationLinks");
+const {prepareAwaitingInvitation}=require("./src/crm/awaitingApplicationLink");
 const { featureEnabled: reminderStaffEnabled, decideReminder } =
   require("./src/crm/staffReminderActions");
 const { makeStore } = require("./src/crm/storage");
@@ -213,6 +215,12 @@ const server = http.createServer(async (req, res) => {
         dashboard.applicationInvitationApprovalEnabled = liveStaffMode &&
           actionsEnabled(process.env) &&
           process.env.PHASE22_APPLICATION_INVITATIONS_ENABLED === "true";
+        dashboard.propertyApplicationLinksEnabled = liveStaffMode &&
+          actionsEnabled(process.env) &&
+          process.env.PHASE22_PROPERTY_APPLICATION_LINKS_ENABLED === "true";
+        dashboard.propertyApplicationLinks = dashboard.propertyApplicationLinksEnabled
+          ? await Promise.all(Object.keys(PROPERTIES).map(id=>getApplicationLink(crm,id)))
+          : [];
         dashboard.outcomeBookings = dashboard.outcomeActionsEnabled
           ? (await crm.store.list("bookings",200)).filter(b =>
               b.provider === "calendly" &&
@@ -237,6 +245,18 @@ const server = http.createServer(async (req, res) => {
     }
     // Live actions remain disabled unless explicitly released on the private service.
     if (liveStaffMode) {
+      const propertyLinkPath = pathname.match(
+        /^\/api\/staff\/properties\/(ziegler|virginia)\/application-link$/
+      );
+      const propertyLinkRequest = Boolean(propertyLinkPath &&
+        actionsEnabled(process.env) &&
+        process.env.PHASE22_PROPERTY_APPLICATION_LINKS_ENABLED === "true");
+      const prepareLinkPath = pathname.match(
+        /^\/api\/staff\/tasks\/(to_[a-f0-9]{40})\/prepare-application-link$/
+      );
+      const prepareLinkRequest = Boolean(prepareLinkPath &&
+        actionsEnabled(process.env) &&
+        process.env.PHASE22_PROPERTY_APPLICATION_LINKS_ENABLED === "true");
       const invitationPath = pathname.match(
         /^\/api\/staff\/tasks\/(to_[a-f0-9]{40})\/approve-application-invitation$/
       );
@@ -262,7 +282,7 @@ const server = http.createServer(async (req, res) => {
         stagePath && actionsEnabled(process.env)
       );
       if (req.method !== "POST" ||
-          (!reminderRequest && !milestoneRequest && !outcomeRequest && !invitationRequest)) {
+          (!reminderRequest && !milestoneRequest && !outcomeRequest && !invitationRequest && !propertyLinkRequest && !prepareLinkRequest)) {
         sendJson(res,403,{error:"Live staff actions disabled"});
         return;
       }
@@ -292,6 +312,18 @@ const server = http.createServer(async (req, res) => {
       if (!body) return;
 
       try {
+        if (propertyLinkRequest) {
+          const result=await setApplicationLink(crm,propertyLinkPath[1],body,
+            {env:process.env,actor:verifiedStaff.actor});
+          sendJson(res,200,result);
+          return;
+        }
+        if (prepareLinkRequest) {
+          const result=await prepareAwaitingInvitation(crm,prepareLinkPath[1],
+            {env:process.env,actor:verifiedStaff.actor,confirmed:body.confirmed});
+          sendJson(res,200,result);
+          return;
+        }
         if (invitationRequest) {
           const result=await approveInvitationForReview(
             crm,invitationPath[1],
