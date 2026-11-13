@@ -13,6 +13,12 @@ describe("Phase 23M-3C lease owner browser integration",()=>{
   expect(html).toContain('I reviewed this exact DOCX');
   expect(html).toContain('Download approved DOCX');
  });
+ test("Detroit guarantor form is optional and download filenames are descriptive",()=>{
+  expect(html).toContain('input.required=!key.startsWith("guarantor")');
+  expect(html).toContain('leaseFilenameBase(selected.property,fields.tenantName,fields.startDate,result.sha256)');
+  expect(html).toContain('currentLease.filenameBase+"-review-unapproved.docx"');
+  expect(html).toContain('currentLease.filenameBase+"-approved-for-manual-signing.docx"');
+ });
  test("feature hidden by default; only displayed from server flag",()=>{
   expect(html).toContain('id="leaseOwnerSection" hidden');
   expect(html).toContain('data.leaseOwnerWorkflowEnabled===true');

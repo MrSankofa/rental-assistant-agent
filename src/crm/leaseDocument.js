@@ -118,7 +118,15 @@ function renderLeaseDocument({
     fail("Lease template has no replacement fields");
   }
 
+  // Some approved Detroit templates contain optional guarantor placeholders.
+  // Explicit blank values allow the same approved template to render without a guarantor.
   const values = {...fields};
+  if (engagement.targetId === "virginia") {
+    for (const key of ["guarantorName", "guarantorRelationship",
+        "guarantorAddress", "guarantorPhone", "guarantorEmail"]) {
+      if (values[key] == null) values[key] = "";
+    }
+  }
 
   for (const [alias, source] of Object.entries(ALIASES)) {
     if (values[source] !== undefined) {

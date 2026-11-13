@@ -28,7 +28,7 @@ function requiredFields(propertyId) {
   }
   const detroit = propertyId === "virginia";
   return {
-    applicant: [...APPLICANT_FIELDS, ...(detroit ? DETROIT_APPLICANT_FIELDS : [])],
+applicant: [...APPLICANT_FIELDS],
     owner: [...OWNER_FIELDS, ...(detroit ? DETROIT_OWNER_FIELDS : [])]
   };
 }
@@ -66,7 +66,8 @@ function planLeaseReadiness({engagement, fields = {}} = {}) {
   if (!fields || typeof fields !== "object" || Array.isArray(fields)) {
     fail("Invalid lease fields");
   }
-  const allowed = new Set([...required.applicant, ...required.owner]);
+const allowed = new Set([...required.applicant, ...required.owner,
+    ...(engagement.targetId === "virginia" ? DETROIT_APPLICANT_FIELDS : [])]);
   for (const [key, value] of Object.entries(fields)) {
     if (HOLDING_FIELDS.has(key)) {
       fail("Holding deposit data is excluded from current lease drafts", 409);
@@ -79,7 +80,15 @@ function planLeaseReadiness({engagement, fields = {}} = {}) {
   if (fields.startDate && fields.endDate && fields.startDate >= fields.endDate) {
     fail("Lease end date must follow start date");
   }
-  const missingApplicantFields = required.applicant.filter(key => !fields[key]);
+  // Detroit guarantor is optional, but partial guarantor details are ambiguous.
+  // When present, require every contact field and validate the email normally.
+  let missingGuarantorFields = [];
+  if (engagement.targetId === "virginia" &&
+      DETROIT_APPLICANT_FIELDS.some(key => Boolean(fields[key]))) {
+    missingGuarantorFields = DETROIT_APPLICANT_FIELDS.filter(key => !fields[key]);
+  }
+  const missingApplicantFields = [...required.applicant.filter(key => !fields[key]),
+    ...missingGuarantorFields];
   const missingOwnerFields = required.owner.filter(key => !fields[key]);
   const missingFields = [...missingApplicantFields, ...missingOwnerFields];
   // Validate completed amounts even if applicant contact fields are missing.

@@ -1082,7 +1082,8 @@ function leaseSelectChanged(){
    wrapper.style.gap="5px";
    wrapper.textContent=label;
    const input=document.createElement("input");
-   input.name=key;input.required=true;input.maxLength=300;
+    input.name=key;input.required=!key.startsWith("guarantor");input.maxLength=300;
+    if(key.startsWith("guarantor"))input.placeholder="Optional";
    input.type=key.endsWith("Date")?"date":key.toLowerCase().includes("email")?"email":"text";
    if(["rentAmount","depositAmount","totalAmount"].includes(key)) input.inputMode="decimal";
    if(key==="tenantName") input.value=selected.contact?.name||"";
@@ -1112,7 +1113,15 @@ function leaseSetAvailability(data){
 async function leaseRequest(url,body){
  return json(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
 }
-async function leaseBinary(url,filename){
+ function leaseFilenameBase(property,tenantName,startDate,sha256){
+  const propertyName=property==="virginia"?"detroit":"dearborn-heights";
+  const slug=String(tenantName||"tenant").normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g,"").toLowerCase()
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48)||"tenant";
+  const date=/^\d{4}-\d{2}-\d{2}$/.test(startDate)?startDate:"date-unset";
+  return `${propertyName}-${slug}-${date}-${sha256.slice(0,12)}`;
+ }
+ async function leaseBinary(url,filename){
  const response=await fetch(url,{cache:"no-store",credentials:"same-origin"});
  if(!response.ok){let reason="Download denied";
    try{const data=await response.json();reason=data.error||reason;}catch(_){ }
@@ -1135,7 +1144,8 @@ q("leaseOwnerForm").addEventListener("submit",async event=>{
  try{
    const result=await leaseRequest("/api/staff/leases/drafts",{
       engagementId:selected.id,propertyId:selected.property,fields});
-   currentLease={propertyId:selected.property,sha256:result.sha256,approved:false};
+    currentLease={propertyId:selected.property,sha256:result.sha256,approved:false,
+      filenameBase:leaseFilenameBase(selected.property,fields.tenantName,fields.startDate,result.sha256)};
    q("leaseDraftHash").textContent=result.sha256;
    q("leaseReviewActions").hidden=false;
    q("leaseDownload").hidden=true;
@@ -1146,7 +1156,7 @@ q("leaseOwnerForm").addEventListener("submit",async event=>{
 });
 q("leasePreview").addEventListener("click",async()=>{
  if(!currentLease)return;
- try{await leaseBinary(`/api/staff/leases/${currentLease.propertyId}/${currentLease.sha256}/preview`,"lease-review-unapproved.docx");
+  try{await leaseBinary(`/api/staff/leases/${currentLease.propertyId}/${currentLease.sha256}/preview`,currentLease.filenameBase+"-review-unapproved.docx");
  leaseNote("Unapproved review copy downloaded. Inspect it in Word before approving.");}
  catch(error){leaseNote(error.message);}
 });
@@ -1165,7 +1175,7 @@ q("leaseApprove").addEventListener("click",async()=>{
 q("leaseDownload").addEventListener("click",async()=>{
  if(!currentLease?.approved)return;
  try{await leaseBinary(`/api/staff/leases/${currentLease.propertyId}/${currentLease.sha256}/download`,
-   "lease-approved-for-manual-signing.docx");leaseNote("Approved DOCX downloaded. No document was sent automatically.");}
+    currentLease.filenameBase+"-approved-for-manual-signing.docx");leaseNote("Approved DOCX downloaded. No document was sent automatically.");}
  catch(error){leaseNote(error.message);}
 });
 q("refresh").addEventListener("click",reload);

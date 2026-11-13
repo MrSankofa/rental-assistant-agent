@@ -47,10 +47,19 @@ describe("Phase 23K no-holding lease readiness and financial integration", () =>
     ]) expect(() => planLeaseReadiness({engagement:approved,
       fields:{...fields,...changes}})).toThrow();
   });
-  test("Detroit still requires room and guarantor fields", () => {
+  test("Detroit requires a room but not a guarantor", () => {
     const result = planLeaseReadiness({engagement:{...approved,targetId:"virginia"},fields});
     expect(result.missingOwnerFields).toContain("roomNumber");
-    expect(result.missingApplicantFields).toContain("guarantorName");
+    expect(result.missingApplicantFields).not.toContain("guarantorName");
+    const completed=planLeaseReadiness({engagement:{...approved,targetId:"virginia"},fields:{...fields,roomNumber:"2B"}});
+    expect(completed.missingFields).toEqual([]);
+  });
+  test("partial Detroit guarantor data must be completed", () => {
+    const engagement={...approved,targetId:"virginia"};
+    const result=planLeaseReadiness({engagement,fields:{...fields,roomNumber:"2B",guarantorName:"Fictional Guarantor"}});
+    expect(result.missingApplicantFields).toContain("guarantorEmail");
+    expect(result.missingApplicantFields).not.toContain("guarantorName");
+    expect(() => planLeaseReadiness({engagement,fields:{...fields,roomNumber:"2B",guarantorEmail:"N/A"}})).toThrow("Invalid email");
   });
   test("no applicant contact data is emitted in the readiness plan", () => {
     const result = planLeaseReadiness({engagement:approved,fields});

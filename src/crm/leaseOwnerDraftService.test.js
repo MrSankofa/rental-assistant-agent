@@ -72,6 +72,18 @@ describe('Phase 23M-1 verified owner draft preparation',()=>{
     expect(output.approvedTemplateEvidence.legalReviewReference).toBe('LEGAL_REVIEW_123');
     expect(output.sha256).toMatch(/^[a-f0-9]{64}$/);
   });
+  test('Detroit template renders with no guarantor supplied',async()=>{
+    const h=await harness({propertyId:'virginia'});
+    const fields={...h.fields};
+    for(const key of Object.keys(fields))if(key.startsWith('guarantor'))delete fields[key];
+    const output=await h.service.prepare({engagement:h.engagement,fields,assertion:'signed-test-assertion'});
+    expect(output.document).toBeInstanceOf(Buffer);
+    const Docxtemplater=require('docxtemplater');
+    const doc=new Docxtemplater(new PizZip(output.document));
+    const content=doc.getFullText();
+    expect(content).not.toMatch(/<<guarantor/);
+    expect(output.sent).toBe(false);
+  });
   test('unsigned identity is rejected before reading object',async()=>{
     const h=await harness({verified:false});
     await expect(h.service.prepare({engagement:h.engagement,fields:h.fields})).rejects.toMatchObject({status:403});
