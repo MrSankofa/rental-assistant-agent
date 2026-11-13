@@ -10,9 +10,12 @@ function identity(propertyId, sha256) {
   if (!PROPERTIES.has(propertyId) || typeof sha256 !== "string" || !HASH.test(sha256)) fail("Invalid template identity");
   return `${propertyId}_${sha256}`;
 }
-function pointerId(propertyId) {
+function pointerId(propertyId, variant = "standard") {
   if (!PROPERTIES.has(propertyId)) fail("Unsupported property");
-  return `active_${propertyId}`;
+  if (variant !== "standard" && !(propertyId === "virginia" && variant === "guarantor")) {
+    fail("Unsupported lease template variant");
+  }
+  return variant === "standard" ? `active_${propertyId}` : `active_${propertyId}_${variant}`;
 }
 function validate(metadata) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) fail("Invalid metadata");
@@ -52,8 +55,8 @@ class LeaseTemplateVersionStore {
     if (version.propertyId !== propertyId || version.sha256 !== sha256) fail("Version identity mismatch", 409);
     return version;
   }
-  async getActive(propertyId) {
-    const row = await this.store.get(POINTERS, pointerId(propertyId));
+  async getActive(propertyId, variant = "standard") {
+    const row = await this.store.get(POINTERS, pointerId(propertyId, variant));
     if (!row) return {sha256: null, revision: null};
     if (row.value?.propertyId !== propertyId ||
         (row.value.sha256 !== null && (typeof row.value.sha256 !== "string" || !HASH.test(row.value.sha256)))) {
@@ -62,29 +65,33 @@ class LeaseTemplateVersionStore {
     return {sha256: row.value.sha256, revision: row.version};
   }
   // Internal-only foundation. Authorization and evidence verification are NOT implemented here.
-  async setActive({propertyId, sha256, expectedRevision, actorContext}) {
-    pointerId(propertyId);
+  async setActive({propertyId, sha256, expectedRevision, actorContext, variant = "standard"}) {
+    pointerId(propertyId, variant);
     if (sha256 !== null) identity(propertyId, sha256);
-    if (await this.authorizeActivation({propertyId, sha256, actorContext}) !== true) fail("Activation forbidden", 403);
+    if (await this.authorizeActivation({propertyId, sha256, actorContext, variant}) !== true) fail("Activation forbidden", 403);
     if (sha256 !== null) {
       if (!await this.getVersion(propertyId, sha256)) fail("Version not found", 404);
       const evidence = await this.store.get(APPROVALS, identity(propertyId, sha256));
       if (!evidence || evidence.value?.verified !== true || evidence.value?.propertyId !== propertyId ||
           evidence.value?.sha256 !== sha256 ||
-          typeof evidence.value?.legalReviewReference !== "string" || !evidence.value.legalReviewReference ||
+          !(
+            (typeof evidence.value?.legalReviewReference === "string" && !!evidence.value.legalReviewReference) ||
+            (evidence.value?.approvalBasis === "owner-attestation" &&
+             evidence.value?.ownerApprovedWithoutLegalReview === true)
+          ) ||
           typeof evidence.value?.ownerApprovalReference !== "string" || !evidence.value.ownerApprovalReference) {
         fail("Verified approval evidence required", 403);
       }
     }
     const pointer = {propertyId, sha256};
-    const id = pointerId(propertyId);
+    const id = pointerId(propertyId, variant);
     if (expectedRevision === null) {
       if (!await this.store.create(POINTERS, id, pointer)) throw new StoreConflict();
     } else {
       if (typeof expectedRevision !== "string" || !expectedRevision) fail("Expected revision required");
       await this.store.replace(POINTERS, id, pointer, expectedRevision);
     }
-    return this.getActive(propertyId);
+    return this.getActive(propertyId, variant);
   }
 }
 module.exports = {LeaseTemplateVersionStore, identity, VERSIONS, POINTERS, APPROVALS};

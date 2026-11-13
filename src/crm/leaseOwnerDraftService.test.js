@@ -18,8 +18,9 @@ const detroitFields = {
   ...baseFields,roomNumber:"2",guarantorName:"Fictional Guarantor",guarantorRelationship:"Parent",
   guarantorAddress:"456 Example Ave",guarantorPhone:"3135550101",guarantorEmail:"guarantor@example.test"
 };
-function fixture(propertyId, {holding = false} = {}) {
-  const tags = Object.keys(propertyId === "virginia" ? detroitFields : baseFields);
+function fixture(propertyId, {holding = false, noGuarantor = false} = {}) {
+  const tags = Object.keys(propertyId === "virginia" ? detroitFields : baseFields)
+    .filter(tag => !noGuarantor || !tag.startsWith("guarantor"));
   const xml = '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' +
     tags.map(tag => `<w:p><w:r><w:t>&lt;&lt;${tag}&gt;&gt;</w:t></w:r></w:p>`).join("") +
     (holding ? '<w:p><w:r><w:t>Holding Deposit</w:t></w:r></w:p>' : "") +
@@ -35,9 +36,9 @@ function fixture(propertyId, {holding = false} = {}) {
     .file('word/document.xml',xml)
     .generate({type:'nodebuffer',compression:'STORE'});
 }
-async function harness({propertyId="ziegler", active=true, approved=true, holding=false, allow=true, verified=true}={}) {
+async function harness({propertyId="ziegler", active=true, approved=true, holding=false, allow=true, verified=true, noGuarantor=false}={}) {
   const store = new MemoryStore();
-  const bytes = fixture(propertyId,{holding});
+  const bytes = fixture(propertyId,{holding,noGuarantor});
   const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
   const versions = new LeaseTemplateVersionStore(store,{authorizeActivation:async()=>true});
   await versions.createVersion({propertyId,sha256,
@@ -50,7 +51,8 @@ async function harness({propertyId="ziegler", active=true, approved=true, holdin
     if (!approved) {
       // Synthetic tampered pointer: confirm no evidence means no rendering.
       await store.create('lease-template-pointers',`active_${propertyId}`,{propertyId,sha256});
-    } else await versions.setActive({propertyId,sha256,expectedRevision:null});
+    } else await versions.setActive({propertyId,sha256,expectedRevision:null,
+      variant:propertyId === "virginia" && !noGuarantor ? "guarantor" : "standard"});
   }
   const objects={get:jest.fn(async()=>bytes)};
   const service=new LeaseOwnerDraftService({store,objects,
@@ -73,7 +75,7 @@ describe('Phase 23M-1 verified owner draft preparation',()=>{
     expect(output.sha256).toMatch(/^[a-f0-9]{64}$/);
   });
   test('Detroit template renders with no guarantor supplied',async()=>{
-    const h=await harness({propertyId:'virginia'});
+    const h=await harness({propertyId:'virginia',noGuarantor:true});
     const fields={...h.fields};
     for(const key of Object.keys(fields))if(key.startsWith('guarantor'))delete fields[key];
     const output=await h.service.prepare({engagement:h.engagement,fields,assertion:'signed-test-assertion'});

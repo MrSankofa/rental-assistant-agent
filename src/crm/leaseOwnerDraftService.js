@@ -57,7 +57,12 @@ class LeaseOwnerDraftService {
       fail("Recorded landlord approval required", 409);
     }
 
-    const pointer = await this.versions.getActive(propertyId);
+    const guarantorFields = ["guarantorName", "guarantorRelationship", "guarantorAddress",
+      "guarantorPhone", "guarantorEmail"];
+    const hasGuarantor = propertyId === "virginia" &&
+      guarantorFields.some(key => typeof fields?.[key] === "string" && fields[key].trim());
+    const variant = hasGuarantor ? "guarantor" : "standard";
+    const pointer = await this.versions.getActive(propertyId, variant);
     if (!pointer.sha256) fail("Approved active template required", 409);
     const version = await this.versions.getVersion(propertyId, pointer.sha256);
     if (!version) fail("Active template metadata unavailable", 409);
@@ -66,7 +71,11 @@ class LeaseOwnerDraftService {
     const approval = approvalRow && approvalRow.value;
     if (!approval || approval.verified !== true ||
         approval.propertyId !== propertyId || approval.sha256 !== pointer.sha256 ||
-        typeof approval.legalReviewReference !== "string" || !approval.legalReviewReference ||
+        !(
+          (typeof approval.legalReviewReference === "string" && !!approval.legalReviewReference) ||
+          (approval.approvalBasis === "owner-attestation" &&
+            approval.ownerApprovedWithoutLegalReview === true)
+        ) ||
         typeof approval.ownerApprovalReference !== "string" || !approval.ownerApprovalReference ||
         typeof approval.approvedBy !== "string" || !approval.approvedBy.startsWith("staff:accounts.google.com:")) {
       fail("Verified template approval evidence required", 403);
@@ -74,6 +83,19 @@ class LeaseOwnerDraftService {
 
     const templateBuffer = await this.objects.get({propertyId, sha256: pointer.sha256});
     const validation = validateLeaseTemplate(templateBuffer, propertyId);
+    if (propertyId === "virginia") {
+      const tags = new Set(validation.placeholders);
+      const templateHasGuarantor = guarantorFields.every(key => tags.has(key));
+      const templateHasNone = guarantorFields.every(key => !tags.has(key));
+      if (hasGuarantor ? !templateHasGuarantor : !templateHasNone) {
+        fail("Active Detroit template does not match guarantor selection", 409);
+      }
+      const contents = new Docxtemplater(new PizZip(templateBuffer)).getFullText();
+      // For the standard version, exclude the complete legal addendum, not just its fields.
+      if (!hasGuarantor && /Guarantor Addendum|Guaranty of Tenant Obligations/i.test(contents)) {
+        fail("No-guarantor template still contains a guaranty addendum", 409);
+      }
+    }
     if (validation.needsLegalReview ||
         validation.placeholders.some(tag => /^holdingDeposit/i.test(tag)) ||
         /holding\s*deposit/i.test(new Docxtemplater(new PizZip(templateBuffer)).getFullText())) {
@@ -93,7 +115,8 @@ class LeaseOwnerDraftService {
       templateSha256: pointer.sha256,
       templateRevision: pointer.revision,
       approvedTemplateEvidence: {
-        legalReviewReference: approval.legalReviewReference,
+        legalReviewReference: approval.legalReviewReference || null,
+        approvalBasis: approval.approvalBasis || "legacy-legal-review",
         ownerApprovalReference: approval.ownerApprovalReference
       },
       // Download approval of this exact draft is a separate future step.
