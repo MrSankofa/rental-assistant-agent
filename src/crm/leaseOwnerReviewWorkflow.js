@@ -100,6 +100,25 @@ class LeaseOwnerReviewWorkflow {
     return {draftId: id, propertyId, sha256: object.sha256, created,
       status: "draft-not-sent", approved: false, downloadAuthorized: false};
   }
+  async preview({propertyId, sha256, assertion}) {
+    const actor = await this.authorize(assertion, propertyId);
+    const id = draftId(propertyId, sha256);
+    verifiedDraft(await this.store.get(DRAFTS, id), propertyId, sha256);
+    // Object adapter verifies the SHA-256 of downloaded bytes.
+    const document = await this.objects.get({propertyId, sha256});
+    if (!Buffer.isBuffer(document) || document.length < 1000 || document.length > 5_000_000) {
+      fail("Draft preview bytes unavailable", 409);
+    }
+    return {
+      document,
+      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      filename: `${propertyId}-review-unapproved-${sha256.slice(0,12)}.docx`,
+      cacheControl: "private, no-store",
+      contentDisposition: "attachment",
+      downloadedBy: actor.actor,
+      approved: false
+    };
+  }
   async approve({propertyId, sha256, expectedSha256, confirmed, assertion}) {
     const actor = await this.authorize(assertion, propertyId);
     const id = draftId(propertyId, sha256);

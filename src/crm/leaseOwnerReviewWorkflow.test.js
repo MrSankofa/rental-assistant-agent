@@ -42,6 +42,21 @@ describe("Phase 23M-2 immutable owner draft review and download", () => {
     expect(JSON.stringify(await h.store.get(DRAFTS, result.draftId))).not.toContain("Fictional Applicant");
     expect(h.objects.put).toHaveBeenCalledTimes(1);
   });
+  test("preview permits owner review but not signing download",async()=>{
+    const h=harness();
+    await h.workflow.prepare(h.args);
+    const preview=await h.workflow.preview({propertyId:"ziegler",sha256:sha,assertion:h.args.assertion});
+    expect(preview.document.equals(bytes)).toBe(true);
+    expect(preview.filename).toContain("review-unapproved");
+    expect(preview.approved).toBe(false);
+    expect(await h.store.get(APPROVALS,draftId("ziegler",sha))).toBeNull();
+    await expect(h.workflow.download({propertyId:"ziegler",sha256:sha,assertion:h.args.assertion})).rejects.toMatchObject({status:403});
+  });
+  test("unauthorized preview is blocked before object access",async()=>{
+    const h=harness({authorized:false});
+    await expect(h.workflow.preview({propertyId:"ziegler",sha256:sha,assertion:h.args.assertion})).rejects.toMatchObject({status:403});
+    expect(h.objects.get).not.toHaveBeenCalled();
+  });
   test("requires exact hash confirmation and approval before downloading",async()=>{
     const h=harness();
     await h.workflow.prepare(h.args);

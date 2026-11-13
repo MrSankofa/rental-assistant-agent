@@ -35,11 +35,12 @@ async function readBody(req, max=4096) {
  */
 async function handleLeaseOwnerRoute({req,res,pathname,workflow,enabled=false}) {
   const prepare = pathname === "/api/staff/leases/drafts" && req.method==="POST";
-  const match = pathname.match(/^\/api\/staff\/leases\/(ziegler|virginia)\/([a-f0-9]{64})\/(approve|download)$/);
+  const match = pathname.match(/^\/api\/staff\/leases\/(ziegler|virginia)\/([a-f0-9]{64})\/(approve|download|preview)$/);
   const approve=Boolean(match && match[3]==="approve" && req.method==="POST");
   const download=Boolean(match && match[3]==="download" && req.method==="GET");
-  if (!prepare && !approve && !download) return false;
-  if (!enabled || !workflow || ["prepare","approve","download"].some(k=>typeof workflow[k]!=="function")) {
+  const preview=Boolean(match && match[3]==="preview" && req.method==="GET");
+  if (!prepare && !approve && !download && !preview) return false;
+  if (!enabled || !workflow || ["prepare","approve","download","preview"].some(k=>typeof workflow[k]!=="function")) {
     reply(res,404,{error:"Not found"});return true;
   }
   // An IAP assertion is verified by the workflow's trusted server-only verifyActor.
@@ -65,12 +66,13 @@ async function handleLeaseOwnerRoute({req,res,pathname,workflow,enabled=false}) 
       const result=await workflow.approve({propertyId:match[1],sha256:match[2],expectedSha256:body.expectedSha256,confirmed:body.confirmed,assertion});
       reply(res,200,{draftId:result.draftId,sha256:result.sha256,status:result.status,sent:false});
     } else {
-      const result=await workflow.download({propertyId:match[1],sha256:match[2],assertion});
+      const result=await (preview ? workflow.preview : workflow.download).call(workflow,{propertyId:match[1],sha256:match[2],assertion});
       if (!Buffer.isBuffer(result.document) || result.document.length<1000 || result.document.length>5_000_000 ||
           result.contentType!==DOCX || typeof result.filename!=="string" || !/^[a-z0-9_-]+\.docx$/.test(result.filename)) {
         fail("Invalid authorized draft download",409);
       }
       res.writeHead(200,{"Content-Type":DOCX,"Content-Disposition":`attachment; filename="${result.filename}"`,
+        "X-Lease-Draft-Status":preview ? "review-unapproved" : "approved-for-manual-download",
         "Content-Length":result.document.length,"Cache-Control":"private, no-store", "X-Content-Type-Options":"nosniff", "Referrer-Policy":"no-referrer"});
       res.end(result.document);
     }
