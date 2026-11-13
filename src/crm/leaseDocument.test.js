@@ -104,7 +104,6 @@ describe("Phase 23D document safety", () => {
       tenantEmail: "fictional@example.com",
       rentAmount: "1500",
       depositAmount: "1500",
-      holdingDepositAmount: "300",
       totalAmount: "3000",
       startDate: "2026-12-01",
       endDate: "2027-11-30"
