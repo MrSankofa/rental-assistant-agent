@@ -196,6 +196,27 @@ details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.
 <section><h2>Staff action queue</h2><p class="muted">Review tasks and recorded decisions. This staff workspace does not send email or SMS. Eligible routine email follow-ups are handled by the separate production sender.</p>
 <div id="staffTaskCards" class="staff-task-grid"></div>
 <div id="legacyTaskTable" class="scroll"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th>Suggested draft (not sent)</th><th>Review and delivery</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
+<section id="leaseOwnerSection" hidden>
+  <h2>Lease preparation (owner review)</h2>
+  <p class="muted">Prepare, review, and approve a DOCX for manual DocuSign upload. Nothing is emailed or signed automatically.</p>
+  <form id="leaseOwnerForm" class="staff-milestone-form" style="max-width:700px">
+    <label for="leaseEngagement">Approved applicant</label>
+    <select id="leaseEngagement" required></select>
+    <div id="leaseFieldInputs" class="staff-task-grid"></div>
+    <button id="leasePrepare" type="submit">Prepare lease draft (not sent)</button>
+  </form>
+  <p id="leaseOwnerMessage" role="status" class="muted"></p>
+  <div id="leaseReviewActions" hidden>
+    <p>Document SHA-256: <code id="leaseDraftHash"></code></p>
+    <button id="leasePreview" type="button">Download unapproved review copy</button>
+    <label style="display:block;margin:14px 0">
+      <input id="leaseApprovalConfirm" type="checkbox">
+      I reviewed this exact DOCX and approve it for manual signing.
+    </label>
+    <button id="leaseApprove" type="button">Approve exact lease draft</button>
+    <button id="leaseDownload" type="button" hidden>Download approved DOCX</button>
+  </div>
+</section>
 </main><script>
 const q=id=>document.getElementById(id);
 const stamp=x=>x?new Date(x).toLocaleString():"";
@@ -212,6 +233,7 @@ async function reload(){
   const data=await json("/api/staff/dashboard");
   const pipeline=q("pipeline"),tasks=q("tasks");pipeline.replaceChildren();tasks.replaceChildren();
   const live=data.workspace==="live";
+  leaseSetAvailability(data);
   q("prospectCards").replaceChildren();
   q("legacyPipelineTable").hidden=live;
   q("staffTaskCards").replaceChildren();
@@ -1031,6 +1053,121 @@ async function reload(){
   message("Loaded "+data.pipeline.length+" engagements; showing "+filtered.length+" filtered records");
  }catch(e){message("Unable to load CRM: "+e.message);}
 }
+const LEASE_FIELDS = [
+ ["tenantName","Tenant full name"],["tenantPrevAddress","Tenant previous address"],
+ ["tenantPhone","Tenant phone"],["tenantEmail","Tenant email"],
+ ["rentAmount","Monthly rent ($)"],["depositAmount","Security deposit ($)"],
+ ["totalAmount","Amount due ($)"],["startDate","Lease start date"],
+ ["endDate","Lease end date"],["roomNumber","Detroit room number"],
+ ["guarantorName","Guarantor name"],["guarantorRelationship","Guarantor relationship"],
+ ["guarantorAddress","Guarantor address"],["guarantorPhone","Guarantor phone"],
+ ["guarantorEmail","Guarantor email"]
+];
+let leaseSelection = new Map();
+let currentLease = null;
+let leaseEnabledInBrowser = false;
+function leaseNote(value){q("leaseOwnerMessage").textContent=value;}
+function leaseSelectChanged(){
+ currentLease=null;
+ q("leaseReviewActions").hidden=true;
+ q("leaseApprovalConfirm").checked=false;
+ const selected=leaseSelection.get(q("leaseEngagement").value);
+ const property=selected?.property;
+ const fieldArea=q("leaseFieldInputs");fieldArea.replaceChildren();
+ if(!selected)return;
+ for(const [key,label] of LEASE_FIELDS){
+   if(property!=="virginia" && (key==="roomNumber" || key.startsWith("guarantor")))continue;
+   const wrapper=document.createElement("label");
+   wrapper.style.display="flex";wrapper.style.flexDirection="column";
+   wrapper.style.gap="5px";
+   wrapper.textContent=label;
+   const input=document.createElement("input");
+   input.name=key;input.required=true;input.maxLength=300;
+   input.type=key.endsWith("Date")?"date":key.toLowerCase().includes("email")?"email":"text";
+   if(["rentAmount","depositAmount","totalAmount"].includes(key)) input.inputMode="decimal";
+   if(key==="tenantName") input.value=selected.contact?.name||"";
+   if(key==="tenantEmail") input.value=selected.contact?.email||"";
+   if(key==="tenantPhone") input.value=selected.contact?.phone||"";
+   wrapper.append(input);fieldArea.append(wrapper);
+ }
+}
+function leaseSetAvailability(data){
+ const available=data.leaseOwnerWorkflowEnabled===true;
+ leaseEnabledInBrowser=available;
+ q("leaseOwnerSection").hidden=!available;
+ if(!available){currentLease=null;return;}
+ const select=q("leaseEngagement");
+ const previous=select.value;
+ leaseSelection=new Map((data.pipeline||[])
+   .filter(e=>e.stage==="APPROVED" && e.handoff?.decision?.status==="approved" &&
+       ["ziegler","virginia"].includes(e.property))
+   .map(e=>[e.id,e]));
+ select.replaceChildren(new Option("Choose an approved applicant",""));
+ for(const e of leaseSelection.values()){
+   select.add(new Option((e.contact?.name||"Applicant")+" - "+propertyName(e.property),e.id));
+ }
+ select.value=leaseSelection.has(previous)?previous:"";
+ leaseSelectChanged();
+}
+async function leaseRequest(url,body){
+ return json(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+}
+async function leaseBinary(url,filename){
+ const response=await fetch(url,{cache:"no-store",credentials:"same-origin"});
+ if(!response.ok){let reason="Download denied";
+   try{const data=await response.json();reason=data.error||reason;}catch(_){ }
+   throw new Error(reason);
+ }
+ const blob=await response.blob();
+ const link=document.createElement("a");const objectUrl=URL.createObjectURL(blob);
+ link.href=objectUrl;link.download=filename;document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
+}
+q("leaseEngagement").addEventListener("change",leaseSelectChanged);
+q("leaseOwnerForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ if(!leaseEnabledInBrowser || !event.currentTarget.reportValidity())return;
+ const selected=leaseSelection.get(q("leaseEngagement").value);
+ if(!selected)return;
+ const fields={};
+ for(const input of q("leaseFieldInputs").querySelectorAll("input"))fields[input.name]=input.value.trim();
+ const button=q("leasePrepare");button.disabled=true;
+ try{
+   const result=await leaseRequest("/api/staff/leases/drafts",{
+      engagementId:selected.id,propertyId:selected.property,fields});
+   currentLease={propertyId:selected.property,sha256:result.sha256,approved:false};
+   q("leaseDraftHash").textContent=result.sha256;
+   q("leaseReviewActions").hidden=false;
+   q("leaseDownload").hidden=true;
+   q("leaseApprove").hidden=false;
+   q("leaseApprovalConfirm").checked=false;
+   leaseNote("Draft prepared. Download and inspect the review copy before approving.");
+ }catch(error){leaseNote(error.message);}finally{button.disabled=false;}
+});
+q("leasePreview").addEventListener("click",async()=>{
+ if(!currentLease)return;
+ try{await leaseBinary(`/api/staff/leases/${currentLease.propertyId}/${currentLease.sha256}/preview`,"lease-review-unapproved.docx");
+ leaseNote("Unapproved review copy downloaded. Inspect it in Word before approving.");}
+ catch(error){leaseNote(error.message);}
+});
+q("leaseApprove").addEventListener("click",async()=>{
+ if(!currentLease || !q("leaseApprovalConfirm").checked)return;
+ if(!confirm("Approve this exact lease draft for manual signing? Nothing is sent automatically."))return;
+ const button=q("leaseApprove");button.disabled=true;
+ try{
+  await leaseRequest(`/api/staff/leases/${currentLease.propertyId}/${currentLease.sha256}/approve`,
+     {expectedSha256:currentLease.sha256,confirmed:true});
+  currentLease.approved=true;
+  q("leaseDownload").hidden=false;q("leaseApprove").hidden=true;
+  leaseNote("Approved. Download the signing copy for manual DocuSign upload.");
+ }catch(error){leaseNote(error.message);button.disabled=false;}
+});
+q("leaseDownload").addEventListener("click",async()=>{
+ if(!currentLease?.approved)return;
+ try{await leaseBinary(`/api/staff/leases/${currentLease.propertyId}/${currentLease.sha256}/download`,
+   "lease-approved-for-manual-signing.docx");leaseNote("Approved DOCX downloaded. No document was sent automatically.");}
+ catch(error){leaseNote(error.message);}
+});
 q("refresh").addEventListener("click",reload);
 q("propertyFilter").addEventListener("change",reload);
 q("stageFilter").addEventListener("change",reload);

@@ -2,6 +2,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { requestPath } = require("./src/http/requestPath");
+const {handleLeaseOwnerRoute} = require("./src/http/leaseOwnerRoutes");
+const {enabled:leaseEnabled,makeWorkflow:makeLeaseWorkflow} = require("./src/crm/leaseStaffIntegration");
 const { verifyIapIdentity } = require("./src/http/iapIdentity");
 const { handleCalendlyWebhook } = require("./src/http/calendlyWebhookRoute");
 const { askAI } = require("./src/agent/openai");
@@ -38,6 +40,16 @@ const crmPublicIntakeEnabled = stagingIntakeEnabled(process.env, Boolean(crm));
 const privateStaffMode = Boolean(crm && staffEnabled(process.env));
 const liveStaffMode = Boolean(crm && liveStaffEnabled(process.env));
 const publicIntakeStatus = intakeStatus(process.env, Boolean(crm));
+// The owner lease workflow is staging-only, off by default, and has no public route.
+const leaseWorkflowEnabled = privateStaffMode && leaseEnabled(process.env, crm);
+let leaseWorkflow = null;
+if (leaseWorkflowEnabled) {
+  // Storage SDK is loaded only for the explicitly enabled private staging service.
+  const {Storage} = require("@google-cloud/storage");
+  const bucket = new Storage({projectId:"altruistic-platform"})
+    .bucket(process.env.LEASE_OWNER_BUCKET);
+  leaseWorkflow = makeLeaseWorkflow({crm, env:process.env, bucket});
+}
 const allowedOrigin = process.env.PUBLIC_ORIGIN || "";
 function staffAuthorized(req) {
   const secret = process.env.CRM_ADMIN_TOKEN;
@@ -200,6 +212,11 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
+    if (pathname.startsWith("/api/staff/leases/")) {
+      if (await handleLeaseOwnerRoute({req,res,pathname,
+        workflow:leaseWorkflow,enabled:leaseWorkflowEnabled})) return;
+      sendJson(res,404,{error:"Not found"});return;
+    }
     if (req.method === "GET" && pathname === "/api/staff/dashboard") {
       try {
         const contacts = await crm.listContacts();
@@ -208,6 +225,7 @@ const server = http.createServer(async (req, res) => {
         const dashboard = summarizeDashboard(
           contacts, engagements, tasks,
           {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging",actionsEnabled:liveStaffMode&&actionsEnabled(process.env)});
+        dashboard.leaseOwnerWorkflowEnabled = leaseWorkflowEnabled;
         dashboard.reminderStaffActionsEnabled =
           liveStaffMode && reminderStaffEnabled(process.env);
         dashboard.outcomeActionsEnabled = liveStaffMode &&

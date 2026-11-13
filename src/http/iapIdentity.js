@@ -55,6 +55,7 @@ async function verifyIapIdentity(
   assertion,
   {
     allowedEmails,
+    audience=AUDIENCE,
     fetchFn=globalThis.fetch,
     now=Date.now()
   }={}
@@ -83,8 +84,11 @@ async function verifyIapIdentity(
       typeof header.kid !== "string" ||
       !/^[A-Za-z0-9_-]{1,128}$/.test(header.kid)) reject();
 
+  const permittedAudiences = new Set([AUDIENCE,
+    "/projects/951837038410/locations/us-east5/services/rental-assistant-staff-staging"]);
+  if (!permittedAudiences.has(audience)) reject();
   if (payload.iss !== ISSUER ||
-      payload.aud !== AUDIENCE ||
+      payload.aud !== audience ||
       !Number.isInteger(payload.iat) ||
       !Number.isInteger(payload.exp)) reject();
 
