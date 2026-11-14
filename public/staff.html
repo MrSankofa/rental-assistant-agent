@@ -372,7 +372,12 @@ async function reload(){
       MOVE_IN_CHECKLIST_PENDING:"MOVE_IN_COMPLETED"
     }[e.stage];
 
-    if(nextMilestone){
+    if(nextMilestone && !(data.phase24Enabled===true &&
+      ["RENTREDI_ONBOARDING","LEASE_SIGNING_SCHEDULED",
+       "DISCLOSURES_READY_AND_DELIVERED","LEASE_SIGNED",
+       "MOVE_IN_FUNDS_VERIFIED","KEYS_RELEASED",
+       "MOVE_IN_CHECKLIST_PENDING","MOVE_IN_COMPLETED"
+      ].includes(nextMilestone))){
       const form=document.createElement("form");
       form.className="staff-milestone-form";
 
@@ -584,6 +589,160 @@ async function reload(){
 
       controls.appendChild(form);
     }
+   }
+
+
+   // Phase 24: independent, human-verified leasing tracks.
+   // This UI cannot authorize keys or send external messages.
+   if(live && data.phase24Enabled===true &&
+      e.handoff?.decision?.status==="approved" &&
+      !["DENIED","WITHDRAWN"].includes(e.stage)) {
+
+     const panel=document.createElement("div");
+     panel.className="staff-milestone-form";
+
+     const title=document.createElement("p");
+     title.textContent="Parallel leasing and move-in";
+     panel.appendChild(title);
+
+     const tracks=e.parallelMoveIn?.tracks||{};
+     const definitions={
+       lease:["prepared","sent","signed"],
+       rentredi:["invited"],
+       rent:["due","received","verified"],
+       deposit:["due","received","verified"],
+       disclosures:["delivered"],
+       possession:["lawful-ready"],
+       keys:["released"],
+       checklist:["signed-recorded","copy-delivered"]
+     };
+
+     const names={
+       lease:"Lease signing",
+       rentredi:"RentRedi invitation",
+       rent:"First rent payment",
+       deposit:"Security deposit",
+       disclosures:"Required disclosures",
+       possession:"Owner lawful and physical readiness",
+       keys:"Physical key handover",
+       checklist:"Signed walkthrough checklist"
+     };
+
+     const nextSteps=[];
+
+     for(const [track,steps] of Object.entries(definitions)){
+       const current=tracks[track]?.status||"not started";
+       const line=document.createElement("div");
+       line.className="muted";
+       line.textContent=names[track]+": "+current;
+       panel.appendChild(line);
+
+       const nextIndex=steps.indexOf(current)+1;
+       const keyReady=e.possessionReadiness?.eligibleForOwnerReview===true;
+       const keysReleased=tracks.keys?.status==="released";
+       if(nextIndex<steps.length &&
+          (track!=="keys" || keyReady) &&
+          (track!=="checklist" || keysReleased)){
+         nextSteps.push({
+           track,status:steps[nextIndex],
+           label:names[track]+" - "+steps[nextIndex]
+         });
+       }
+     }
+
+     const readiness=e.possessionReadiness;
+     if(readiness){
+       const info=document.createElement("div");
+       info.className="muted";
+       info.style.marginTop="8px";
+       info.textContent=readiness.eligibleForOwnerReview
+         ? "Ready for separate owner possession review. Keys remain blocked."
+         : "Possession blocked: "+
+           (readiness.missing||[]).join("; ");
+       panel.appendChild(info);
+       if(readiness.keysReleased===true){
+         const record=document.createElement("div");
+         record.className="muted";
+         record.textContent="Physical key release recorded by staff";
+         panel.appendChild(record);
+       }
+     }
+
+     if(nextSteps.length){
+       const form=document.createElement("form");
+       form.className="staff-milestone-form";
+
+       const select=document.createElement("select");
+       select.setAttribute("aria-label","Parallel leasing milestone");
+
+       for(const step of nextSteps){
+         const option=document.createElement("option");
+         option.value=step.track+":"+step.status;
+         option.textContent=step.label;
+         select.appendChild(option);
+       }
+
+       const evidence=document.createElement("textarea");
+       evidence.required=true;
+       evidence.minLength=10;
+       evidence.maxLength=300;
+       evidence.rows=3;
+       evidence.placeholder="External confirmation reference or verified staff evidence";
+       evidence.setAttribute("aria-label","Parallel milestone evidence");
+
+       const confirmation=document.createElement("label");
+       const checkbox=document.createElement("input");
+       checkbox.type="checkbox";
+       checkbox.required=true;
+       confirmation.append(
+         checkbox,
+         "I independently verified this external milestone"
+       );
+
+       const submit=document.createElement("button");
+       submit.type="submit";
+       submit.textContent="Record verified parallel milestone";
+
+       // Preserve the same event ID when retrying a failed request.
+       let eventId=crypto.randomUUID();
+
+       form.addEventListener("submit",async event=>{
+         event.preventDefault();
+         if(!form.reportValidity() || !checkbox.checked)return;
+
+         if(!confirm(
+           "Record this owner-verified milestone? No external message or payment will be sent."
+         ))return;
+
+         const [track,status]=select.value.split(":");
+         submit.disabled=true;
+
+         try{
+           await json(
+             "/api/staff/engagements/"+
+             encodeURIComponent(e.id)+"/parallel-milestones",
+             {
+               method:"POST",
+               headers:{"Content-Type":"application/json"},
+               body:JSON.stringify({
+                 track,status,eventId,
+                 evidence:evidence.value,
+                 confirmed:true
+               })
+             }
+           );
+           await reload();
+         }catch(error){
+           message(error.message);
+           submit.disabled=false;
+         }
+       });
+
+       form.append(select,evidence,confirmation,submit);
+       panel.appendChild(form);
+     }
+
+     controls.appendChild(panel);
    }
 
    if(live && data.outcomeActionsEnabled===true &&

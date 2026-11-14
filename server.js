@@ -13,6 +13,8 @@ const { loadConversation, appendConversation } = require("./src/crm/prospectConv
 
 
 const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
+const {recordParallelMilestone} = require("./src/crm/parallelMilestones");
+const {phase24Enabled,phase24Response,legacyStageBlocked} = require("./src/crm/phase24StaffGate");
 const {recordTourOutcome} = require("./src/crm/tourOutcomeAutomation");
 const {approveInvitationForReview} = require("./src/crm/applicationInvitation");
 const {PROPERTIES,getApplicationLink,setApplicationLink}=require("./src/crm/propertyApplicationLinks");
@@ -226,6 +228,7 @@ const server = http.createServer(async (req, res) => {
           contacts, engagements, tasks,
           {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging",actionsEnabled:liveStaffMode&&actionsEnabled(process.env)});
         dashboard.leaseOwnerWorkflowEnabled = leaseWorkflowEnabled;
+        dashboard.phase24Enabled = liveStaffMode && phase24Enabled(process.env);
         dashboard.reminderStaffActionsEnabled =
           liveStaffMode && reminderStaffEnabled(process.env);
         dashboard.outcomeActionsEnabled = liveStaffMode &&
@@ -298,11 +301,17 @@ const server = http.createServer(async (req, res) => {
       const reminderRequest = Boolean(
         reminderPath && reminderStaffEnabled(process.env)
       );
+      const parallelPath = pathname.match(
+        /^\/api\/staff\/engagements\/([a-zA-Z0-9_-]{8,120})\/parallel-milestones$/
+      );
+      const parallelRequest = Boolean(
+        parallelPath && phase24Enabled(process.env)
+      );
       const milestoneRequest = Boolean(
         stagePath && actionsEnabled(process.env)
       );
       if (req.method !== "POST" ||
-          (!reminderRequest && !milestoneRequest && !outcomeRequest && !invitationRequest && !propertyLinkRequest && !prepareLinkRequest)) {
+          (!reminderRequest && !milestoneRequest && !outcomeRequest && !invitationRequest && !propertyLinkRequest && !prepareLinkRequest && !parallelRequest)) {
         sendJson(res,403,{error:"Live staff actions disabled"});
         return;
       }
@@ -367,6 +376,20 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
+        if (parallelRequest) {
+          const result=await recordParallelMilestone(
+            crm,parallelPath[1],body,verifiedStaff.actor
+          );
+          sendJson(res,200,phase24Response(result));
+          return;
+        }
+
+        if (legacyStageBlocked(body.stage,process.env)) {
+          sendJson(res,409,{
+            error:"Use the Phase 24 parallel leasing workflow"
+          });
+          return;
+        }
         const current=await crm.history(stagePath[1]);
         const milestone=validateMilestone(current,body);
         const result=await crm.transition(

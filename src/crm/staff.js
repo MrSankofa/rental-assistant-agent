@@ -1,5 +1,6 @@
 "use strict";
 const { summarizePipeline } = require("./staffInsights");
+const {evaluatePossessionReadiness} = require("./possessionReadiness");
 
 // Cloud Run IAM is the authentication boundary for both dedicated staff services.
 // Never enable staff endpoints on a public prospect-facing service.
@@ -48,6 +49,8 @@ function summarizeDashboard(contacts, engagements, tasks, {deliveryMode="disable
       nextAction:e.nextAction||"", updatedAt:e.updatedAt, createdAt:e.createdAt,
       application:e.application||null,
       handoff:e.handoff||null,
+      parallelMoveIn:e.parallelMoveIn||null,
+      possessionReadiness:e.domain==="rental" ? evaluatePossessionReadiness(e) : null,
       contact:contact ? {name:contact.name,email:contact.email,phone:contact.phone,
         consent:contact.consent,preferredChannel:contact.preferredChannel} : null
     };
