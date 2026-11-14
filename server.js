@@ -14,6 +14,7 @@ const { loadConversation, appendConversation } = require("./src/crm/prospectConv
 
 const { actionsEnabled, validateMilestone } = require("./src/crm/liveStaffActions");
 const {recordParallelMilestone} = require("./src/crm/parallelMilestones");
+const {buildPhase24ExceptionReport} = require("./src/crm/phase24ExceptionReport");
 const {phase24Enabled,phase24Response,legacyStageBlocked} = require("./src/crm/phase24StaffGate");
 const {recordTourOutcome} = require("./src/crm/tourOutcomeAutomation");
 const {approveInvitationForReview} = require("./src/crm/applicationInvitation");
@@ -229,6 +230,26 @@ const server = http.createServer(async (req, res) => {
           {deliveryMode:deliveryMode(process.env),workspace:liveStaffMode?"live":"staging",actionsEnabled:liveStaffMode&&actionsEnabled(process.env)});
         dashboard.leaseOwnerWorkflowEnabled = leaseWorkflowEnabled;
         dashboard.phase24Enabled = liveStaffMode && phase24Enabled(process.env);
+        if (dashboard.phase24Enabled) {
+          try {
+            dashboard.phase24Exceptions = await buildPhase24ExceptionReport({
+              store:crm.store,
+              engagements,
+              scope:crm.scope
+            });
+            if (engagements.length >= 200) {
+              dashboard.phase24Exceptions.coverage = "partial";
+              dashboard.phase24Exceptions.requiresStaffReview = true;
+            }
+          } catch (_) {
+            dashboard.phase24Exceptions = {
+              coverage:"unavailable",
+              requiresStaffReview:true,
+              issues:[],
+              issueCount:null
+            };
+          }
+        }
         dashboard.reminderStaffActionsEnabled =
           liveStaffMode && reminderStaffEnabled(process.env);
         dashboard.outcomeActionsEnabled = liveStaffMode &&
@@ -643,8 +664,10 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `Rental Assistant running on port ${PORT}`
-  );
-});
+if (require.main === module) {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Rental Assistant running on port ${PORT}`);
+  });
+}
+
+module.exports = {server};

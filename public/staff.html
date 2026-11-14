@@ -319,6 +319,28 @@ async function reload(){
       ? "Private live CRM: authenticated staff may record verified milestones. Staff-controlled message sending is disabled here. Routine production email follow-ups run separately under consent and delivery safeguards."
       : "Private live CRM: read-only review. Staff milestone changes and automated messaging are disabled.") :
     "Private staging workspace. Fictional data only; messaging is simulated.";
+  if(live && data.phase24Enabled===true){
+    const report=data.phase24Exceptions;
+    const details=document.createElement("details");
+    const heading=document.createElement("summary");
+    heading.textContent=report?.coverage==="complete"
+      ? "Phase 24 exceptions: "+report.issueCount
+      : "Phase 24 exceptions: inspection incomplete, staff review required";
+    details.appendChild(heading);
+
+    for(const issue of (report?.issues||[]).slice(0,30)){
+      const line=document.createElement("p");
+      line.textContent=[
+        issue.engagementId,
+        issue.type,
+        issue.track||"",
+        issue.action
+      ].filter(Boolean).join(" | ");
+      details.appendChild(line);
+    }
+
+    q("workspaceDescription").appendChild(details);
+  }
   q("newInquiryCount").textContent="New inquiries awaiting staff review: "+(data.attention?.newInquiryCount ?? 0);
   q("generate").hidden=live;
   for(const e of filtered){
