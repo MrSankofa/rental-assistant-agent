@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.properties = void 0;
 exports.properties = {
     virginia: {
-        name: "Detroit rental",
+        name: "Detroit Rental",
         address: "Virginia Park St",
         city: "Detroit",
         state: "MI",
@@ -20,7 +20,7 @@ exports.properties = {
         showingUrl: "",
     },
     ziegler: {
-        name: "Dearborn Heights rental",
+        name: "Dearborn Heights Rental",
         address: "4932 Ziegler St",
         city: "Dearborn Heights",
         state: "MI",

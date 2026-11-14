@@ -2,8 +2,8 @@ import { properties } from "./properties";
 
 describe("property listing integrity", () => {
   test("rentals use city-facing names", () => {
-    expect(properties.ziegler.name).toBe("Dearborn Heights rental");
-    expect(properties.virginia.name).toBe("Detroit rental");
+    expect(properties.ziegler.name).toBe("Dearborn Heights Rental");
+    expect(properties.virginia.name).toBe("Detroit Rental");
   });
 
   test("Virginia has no vacancies, advertised rent, or application/showing link", () => {

@@ -2,7 +2,7 @@ import { Property } from "../types/property";
 
 export const properties: Record<string, Property> = {
   virginia: {
-    name: "Detroit rental",
+    name: "Detroit Rental",
     address: "Virginia Park St",
     city: "Detroit",
     state: "MI",
@@ -25,7 +25,7 @@ export const properties: Record<string, Property> = {
   },
 
   ziegler: {
-    name: "Dearborn Heights rental",
+    name: "Dearborn Heights Rental",
     address: "4932 Ziegler St",
     city: "Dearborn Heights",
     state: "MI",
