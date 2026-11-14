@@ -18,14 +18,17 @@ const verified={
 };
 
 describe("Phase 25B agent knowledge integration",()=>{
-  test("production registry starts with no unsupported claims",()=>{
+  test("production registry contains owner-confirmed garage facts",()=>{
     const result=getApprovedPropertyKnowledge(
       "ziegler","garage"
     );
 
     expect(result.found).toBe(true);
-    expect(result.informationAvailable).toBe(false);
-    expect(result.facts).toEqual([]);
+    expect(result.informationAvailable).toBe(true);
+    expect(result.facts).toHaveLength(2);
+    expect(result.facts[0].sourceType).toBe("owner");
+    expect(result.facts[0].value)
+      .toContain("manually operated");
   });
 
   test("only approved facts reach the agent",()=>{
@@ -78,7 +81,7 @@ describe("Phase 25B agent knowledge integration",()=>{
     );
 
     expect(result.found).toBe(true);
-    expect(result.informationAvailable).toBe(false);
+    expect(result.informationAvailable).toBe(true);
   });
 
   test("agent instructions forbid fabricated web research",()=>{

@@ -9,6 +9,10 @@ const ALLOWED_PROPERTIES = new Set([
 
 const ALLOWED_TOPICS = new Set([
   "garage",
+  "outdoor",
+  "foundation",
+  "lawn-care",
+  "smoking",
   "appliances",
   "laundry",
   "heating",
