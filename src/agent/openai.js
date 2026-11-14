@@ -226,6 +226,12 @@ function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAva
     - Keep third-party links and internal tool identifiers unchanged.
 
     SCHEDULING:
+    - Always consult getPropertyInformation before making a
+      claim about rental availability or tour eligibility.
+    - If the property is not established, ask which rental
+      the visitor means rather than guessing.
+    - Never claim a property has no verified vacancy simply
+      because its details have not yet been retrieved.
     - Never offer tour appointments for properties with available=false.
     - If property information contains a showingUrl and available=true, that link is the
       authoritative way to schedule a tour.
@@ -286,6 +292,27 @@ function buildInstructions({ followUpFormAvailable = false, guidedShowingFormAva
   `;
 }
 
+function explicitTourProperty(question) {
+  if (typeof question !== "string") return null;
+
+  const tourIntent =
+    /\b(schedule|scheduling|reschedule|rescheduling|book|booking|tour|tours|showing|showings)\b/i
+      .test(question);
+
+  if (!tourIntent) return null;
+
+  const dearborn =
+    /\b(dearborn heights|ziegler)\b/i.test(question);
+
+  const detroit =
+    /\b(detroit|virginia)\b/i.test(question);
+
+  // Ambiguous property references must not trigger a guessed lookup.
+  if (dearborn === detroit) return null;
+
+  return dearborn ? "ziegler" : "virginia";
+}
+
 async function askAI(question, previousResponseId = null, { followUpFormAvailable = false, guidedShowingFormAvailable = false, verifiedProspect = null, priorTurns = [] } = {}) {
   const instructions = buildInstructions({ followUpFormAvailable, guidedShowingFormAvailable, verifiedProspect });
 
@@ -298,6 +325,15 @@ async function askAI(question, previousResponseId = null, { followUpFormAvailabl
       : question,
     tools
   };
+
+  const tourProperty=explicitTourProperty(question);
+
+  if (tourProperty) {
+    initialPayload.tool_choice={
+      type:"function",
+      name:"getPropertyInformation"
+    };
+  }
 
   if (previousResponseId && !verifiedProspect) {
     initialPayload.previous_response_id = previousResponseId;
@@ -370,5 +406,6 @@ async function askAI(question, previousResponseId = null, { followUpFormAvailabl
 module.exports = {
   askAI,
   buildInstructions,
-  executeTool
+  executeTool,
+  explicitTourProperty
 };
